@@ -1,6 +1,4 @@
-<em>
-The Berkeley Tree DataBase (BTrDB) is pronounced "__Better DB__".
-</em>
+_The Berkeley Tree DataBase (BTrDB) is pronounced "**Better DB**"._
 
 # BTrDB
 
