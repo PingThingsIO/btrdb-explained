@@ -56,9 +56,9 @@ which was the original inspiration for this technique.
 **Efficient Versioning**
 
 Data is version-annotated to allow queries of data as it existed at a certain
-time.  This allows reproducible (idempotent) queries of data that might
-otherwise change due to newer realtime data coming in.  Structural sharing of
-data between versions is done to make this process as efficient as possible.
+time.  This allows reproducible query results that might otherwise change due
+to newer realtime data coming in.  Structural sharing of data between versions
+is done to make this process as efficient as possible.
 
 ## Implementation Details
 
