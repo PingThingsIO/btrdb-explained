@@ -39,9 +39,7 @@ In under _200ms_, it can query a year of data at nanosecond-precision (2.1
 trillion points) at any desired window—returning statistical summary points at any
 desired resolution (containing a min/max/mean per point).
 
-```
-TODO: insert GIF of a plotter zooming into a year of data
-```
+![zoom](https://user-images.githubusercontent.com/116838/34006003-6e753618-e0c2-11e7-91bc-65a1cda3cbe7.gif)
 
 **High compression**
 
@@ -60,9 +58,28 @@ time.  This allows reproducible query results that might otherwise change due
 to newer realtime data coming in.  Structural sharing of data between versions
 is done to make this process as efficient as possible.
 
-## Implementation Details
+## The Tree Structure
 
-BTrDB introduces a new abstraction and data structure.
+BTrDB stores its data in a time-partitioned tree.
+
+The tree's root node represents a time range of 2^62 ns (~146 years). This node
+(and all others) represents a statistical picture of 2^6 points (64).  When
+needed, each point is given its own node, representing a higher resolution view
+of its time range.
+
+| level | point width | rough point width |
+|:------|:------------|:------------------|
+| 1     | 2^56 ns     | 2.28 years        |
+| 2     | 2^50 ns     | 13 days           |
+| 3     | 2^44 ns     | 4.88 hours        |
+| 4     | 2^38 ns     | 4.58 min          |
+| 5     | 2^32 ns     | 4.29 s            |
+| 6     | 2^26 ns     | 67.11 ms          |
+| 7     | 2^20 ns     | 1.05 ms           |
+| 8     | 2^14 ns     | 16.38 µs          |
+| 9     | 2^8 ns      | 256 ns            |
+| 10    | 2^2 ns      | 4 ns              |
+| 11    | 2^0 ns      | 1 ns              |
 
 ...
 
