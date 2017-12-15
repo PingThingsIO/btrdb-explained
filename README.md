@@ -62,15 +62,21 @@ is done to make this process as efficient as possible.
 
 BTrDB stores its data in a time-partitioned tree.
 
-The tree's root node represents a time range of 2^62 ns (~146 years). This node
-(and all others) represents a statistical picture of 2^6 points (64).  When
-needed, each point is given its own node, representing a higher resolution view
-of its time range.
+The tree root node represents a time range of 2^62 ns (~146 years). This range
+is evenly partitioned by 2^6 (64) child nodes, each representing 2^56 ns (2.28 years).
+Each child node is a list of raw points at first, but once this list exceeds 64
+points, the points are pushed further down the tree into a new level of
+time-partitioned child nodes. The parent node stores statistical information
+about all points below it to retain a view at its resolution.
+
+The sampling rate of the data determines how deep the tree will be, and can be
+variable. This database supports storing data at nanosecond precision, as you
+can see the 10th level will allow 64 raw points in a given range of 4 ns.
 
 | level | point width | rough point width |
 |:------|:------------|:------------------|
 | 1     | 2^56 ns     | 2.28 years        |
-| 2     | 2^50 ns     | 13 days           |
+| 2     | 2^50 ns     | 13.03 days        |
 | 3     | 2^44 ns     | 4.88 hours        |
 | 4     | 2^38 ns     | 4.58 min          |
 | 5     | 2^32 ns     | 4.29 s            |
@@ -79,7 +85,6 @@ of its time range.
 | 8     | 2^14 ns     | 16.38 µs          |
 | 9     | 2^8 ns      | 256 ns            |
 | 10    | 2^2 ns      | 4 ns              |
-| 11    | 2^0 ns      | 1 ns              |
 
 ...
 
