@@ -60,18 +60,14 @@ is done to make this process as efficient as possible.
 
 ## The Tree Structure
 
-BTrDB stores its data in a time-partitioned tree.
+BTrDB stores its data in a time-partitioned tree, with a branching factor of 64.
+The root node covers ~146 years. Bottom nodes (only ten levels down) cover 4ns
+each.
 
-The tree root node represents a time range of 2^62 ns (~146 years). This range
-is evenly partitioned by 2^6 (64) child nodes, each representing 2^56 ns (2.28 years).
-Each child node is a list of raw points at first, but once this list exceeds 64
-points, the points are pushed further down the tree into a new level of
+Each child node holds a list of raw points until exceeding its capacity of 64.
+Once full, the points are pushed further down the tree into new levels of
 time-partitioned child nodes. The parent node stores statistical information
-about all points below it to retain a view at its resolution.
-
-The sampling rate of the data determines how deep the tree will be, and can be
-variable. This database supports storing data at nanosecond precision, as you
-can see the 10th level will allow 64 raw points in a given range of 4 ns.
+about all points below it to retain a summary at its given resolution.
 
 | level | point width | rough point width |
 |:------|:------------|:------------------|
@@ -85,6 +81,11 @@ can see the 10th level will allow 64 raw points in a given range of 4 ns.
 | 8     | 2^14 ns     | 16.38 µs          |
 | 9     | 2^8 ns      | 256 ns            |
 | 10    | 2^2 ns      | 4 ns              |
+
+Therefore, the sampling rate of the data at different moments will determine how
+deep the tree will be during those slices of time. Regardless of the depth of
+the actual data, the time spent querying at some higher level (lower resolution)
+will remain fixed (quick) due to summaries provided by parent nodes.
 
 ...
 
