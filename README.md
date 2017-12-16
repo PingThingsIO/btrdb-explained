@@ -69,18 +69,22 @@ Once full, the points are pushed further down the tree into new levels of
 time-partitioned child nodes. The parent node stores statistical information
 about all points below it to retain a summary at its given resolution.
 
-| level | point width | rough point width |
-|:------|:------------|:------------------|
-| 1     | 2^56 ns     | 2.28 years        |
-| 2     | 2^50 ns     | 13.03 days        |
-| 3     | 2^44 ns     | 4.88 hours        |
-| 4     | 2^38 ns     | 4.58 min          |
-| 5     | 2^32 ns     | 4.29 s            |
-| 6     | 2^26 ns     | 67.11 ms          |
-| 7     | 2^20 ns     | 1.05 ms           |
-| 8     | 2^14 ns     | 16.38 µs          |
-| 9     | 2^8 ns      | 256 ns            |
-| 10    | 2^2 ns      | 4 ns              |
+| level | node width                       | points\* per node | statistical point width          |
+|:------|:---------------------------------|:------------------|:---------------------------------|
+| 1     | 2<sup>62</sup> ns  (~146 years)  | 64                | 2<sup>56</sup> ns  (~2.28 years) |
+| 2     | 2<sup>56</sup> ns  (~2.28 years) | 64                | 2<sup>50</sup> ns  (~13.03 days) |
+| 3     | 2<sup>50</sup> ns  (~13.03 days) | 64                | 2<sup>44</sup> ns  (~4.88 hours) |
+| 4     | 2<sup>44</sup> ns  (~4.88 hours) | 64                | 2<sup>38</sup> ns  (~4.58 min)   |
+| 5     | 2<sup>38</sup> ns  (~4.58 min)   | 64                | 2<sup>32</sup> ns  (~4.29 s)     |
+| 6     | 2<sup>32</sup> ns  (~4.29 s)     | 64                | 2<sup>26</sup> ns  (~67.11 ms)   |
+| 7     | 2<sup>26</sup> ns  (~67.11 ms)   | 64                | 2<sup>20</sup> ns  (~1.05 ms)    |
+| 8     | 2<sup>20</sup> ns  (~1.05 ms)    | 64                | 2<sup>14</sup> ns  (~16.38 µs)   |
+| 9     | 2<sup>14</sup> ns  (~16.38 µs)   | 64                | 2<sup>8</sup> ns   (256 ns)      |
+| 10    | 2<sup>8</sup> ns   (256 ns)      | 64                | 2<sup>2</sup> ns   (4 ns)        |
+| 11    | 2<sup>2</sup> ns   (4 ns)        | 64                | (no stat points at bottom)       |
+
+_\* a "point" is either a raw data point or a statistical summary of all those
+beneath it in the tree_
 
 Therefore, the sampling rate of the data at different moments will determine how
 deep the tree will be during those slices of time. Regardless of the depth of
