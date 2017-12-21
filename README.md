@@ -86,14 +86,14 @@ A node starts as a __vector node__, storing raw points in a vector of size 1024.
 This is considered a leaf node, since it does not point to any child nodes.
 
 ```
-------------------------------------------------------------------
-|                                                                |
-|                           VECTOR NODE                          |
-|                     (holds 1024 raw points)                    |
-|                                                                |
-|----------------------------------------------------------------|
-|................................................................| <- raw points
-------------------------------------------------------------------
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                           VECTOR NODE                           │
+│                     (holds 1024 raw points)                     │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . │ <- raw points
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 Once this vector is full and more points need to be inserted into its time slot,
@@ -101,16 +101,15 @@ the node is converted to a __core node__ by time-partitioning itself into 64
 "statistical" points.
 
 ```
-------------------------------------------------------------------
-|                                                                |
-|                            CORE NODE                           |
-|                   (holds 64 statistical points)                |
-|                                                                |
-|----------------------------------------------------------------|
-|oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo| <- stat points
-------------------------------------------------------------------
- ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||  <- child node pointers
- vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                            CORE NODE                            │
+│                   (holds 64 statistical points)                 │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ │ <- stat points
+└─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┼─┘
+  ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼ ▼  <- child node pointers
 ```
 
 A __statistical point__ represents a 1/64 slice of its parent's time slot. It
