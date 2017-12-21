@@ -68,6 +68,20 @@ its time slot at a resolution corresponding to its depth in the tree.
 The root node covers ~146 years. With a branching factor of 64, bottom nodes at
 ten levels down cover 4ns each.
 
+| level | node width                       |
+|:------|:---------------------------------|
+| 1     | 2<sup>62</sup> ns  (~146 years)  |
+| 2     | 2<sup>56</sup> ns  (~2.28 years) |
+| 3     | 2<sup>50</sup> ns  (~13.03 days) |
+| 4     | 2<sup>44</sup> ns  (~4.88 hours) |
+| 5     | 2<sup>38</sup> ns  (~4.58 min)   |
+| 6     | 2<sup>32</sup> ns  (~4.29 s)     |
+| 7     | 2<sup>26</sup> ns  (~67.11 ms)   |
+| 8     | 2<sup>20</sup> ns  (~1.05 ms)    |
+| 9     | 2<sup>14</sup> ns  (~16.38 µs)   |
+| 10    | 2<sup>8</sup> ns   (256 ns)      |
+| 11    | 2<sup>2</sup> ns   (4 ns)        |
+
 A node starts as a __vector node__, storing raw points in a vector of size 1024.
 This is considered a leaf node, since it does not point to any child nodes.
 
