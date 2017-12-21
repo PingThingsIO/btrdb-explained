@@ -120,17 +120,17 @@ statistical points.
 
 | level | node width                       | stat points per node | stat point width                 |
 |:------|:---------------------------------|:---------------------|:---------------------------------|
-| 1     | 2<sup>62</sup> ns  (~146 years)  | 64                   | 2<sup>56</sup> ns  (~2.28 years) |
-| 2     | 2<sup>56</sup> ns  (~2.28 years) | 64                   | 2<sup>50</sup> ns  (~13.03 days) |
-| 3     | 2<sup>50</sup> ns  (~13.03 days) | 64                   | 2<sup>44</sup> ns  (~4.88 hours) |
-| 4     | 2<sup>44</sup> ns  (~4.88 hours) | 64                   | 2<sup>38</sup> ns  (~4.58 min)   |
-| 5     | 2<sup>38</sup> ns  (~4.58 min)   | 64                   | 2<sup>32</sup> ns  (~4.29 s)     |
-| 6     | 2<sup>32</sup> ns  (~4.29 s)     | 64                   | 2<sup>26</sup> ns  (~67.11 ms)   |
-| 7     | 2<sup>26</sup> ns  (~67.11 ms)   | 64                   | 2<sup>20</sup> ns  (~1.05 ms)    |
-| 8     | 2<sup>20</sup> ns  (~1.05 ms)    | 64                   | 2<sup>14</sup> ns  (~16.38 µs)   |
-| 9     | 2<sup>14</sup> ns  (~16.38 µs)   | 64                   | 2<sup>8</sup> ns   (256 ns)      |
-| 10    | 2<sup>8</sup> ns   (256 ns)      | 64                   | 2<sup>2</sup> ns   (4 ns)        |
-| 11    | 2<sup>2</sup> ns   (4 ns)        | 64                   | (no stat points at bottom)       |
+| 1     | 2<sup>62</sup> ns  (~146 years)  | 2<sup>6</sup> (64)   | 2<sup>56</sup> ns  (~2.28 years) |
+| 2     | 2<sup>56</sup> ns  (~2.28 years) | 2<sup>6</sup> (64)   | 2<sup>50</sup> ns  (~13.03 days) |
+| 3     | 2<sup>50</sup> ns  (~13.03 days) | 2<sup>6</sup> (64)   | 2<sup>44</sup> ns  (~4.88 hours) |
+| 4     | 2<sup>44</sup> ns  (~4.88 hours) | 2<sup>6</sup> (64)   | 2<sup>38</sup> ns  (~4.58 min)   |
+| 5     | 2<sup>38</sup> ns  (~4.58 min)   | 2<sup>6</sup> (64)   | 2<sup>32</sup> ns  (~4.29 s)     |
+| 6     | 2<sup>32</sup> ns  (~4.29 s)     | 2<sup>6</sup> (64)   | 2<sup>26</sup> ns  (~67.11 ms)   |
+| 7     | 2<sup>26</sup> ns  (~67.11 ms)   | 2<sup>6</sup> (64)   | 2<sup>20</sup> ns  (~1.05 ms)    |
+| 8     | 2<sup>20</sup> ns  (~1.05 ms)    | 2<sup>6</sup> (64)   | 2<sup>14</sup> ns  (~16.38 µs)   |
+| 9     | 2<sup>14</sup> ns  (~16.38 µs)   | 2<sup>6</sup> (64)   | 2<sup>8</sup> ns   (256 ns)      |
+| 10    | 2<sup>8</sup> ns   (256 ns)      | 2<sup>6</sup> (64)   | 2<sup>2</sup> ns   (4 ns)        |
+| 11    | 2<sup>2</sup> ns   (4 ns)        | (no stat points at bottom) |  |
 
 The sampling rate of the data at different moments will determine how deep the
 tree will be during those slices of time. Regardless of the depth of the actual
