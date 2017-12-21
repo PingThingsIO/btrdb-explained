@@ -60,17 +60,50 @@ is done to make this process as efficient as possible.
 
 ## The Tree Structure
 
-BTrDB stores its data in a time-partitioned tree, with a branching factor of 64.
-The root node covers ~146 years. Bottom nodes (only ten levels down) cover 4ns
-each.
+BTrDB stores its data in a time-partitioned tree.
 
-Each child node holds a vector of raw points at a capacity of 1024. This is
-called a __vector node__.  Once full, this vector node is converted to a __core
-node__ by time-partitioning itself into 64 "statistical" points, each now
-pointing to a new vector node. The "raw" points are then pushed into the
-appropriate new vector nodes depending on its timestamp. The statistical points
-at the parent of each new child node stores the min/max/mean/count of all points
-below it to retain a summary at its given resolution.
+All nodes represent a given time slot. A node can describe all points within
+its time slot at a resolution corresponding to its depth in the tree.
+
+The root node covers ~146 years. With a branching factor of 64, bottom nodes at
+ten levels down cover 4ns each.
+
+A node starts as a __vector node__, storing raw points in a vector of size 1024.
+This is considered a leaf node, since it does not point to any child nodes.
+
+```
+------------------------------------------------------------------
+|                                                                |
+|                           VECTOR NODE                          |
+|                     (holds 1024 raw points)                    |
+|                                                                |
+|----------------------------------------------------------------|
+|................................................................| <- raw points
+------------------------------------------------------------------
+```
+
+Once this vector is full and more points need to be inserted into its time slot,
+the node is converted to a __core node__ by time-partitioning itself into 64
+"statistical" points.
+
+```
+------------------------------------------------------------------
+|                                                                |
+|                            CORE NODE                           |
+|                   (holds 64 statistical points)                |
+|                                                                |
+|----------------------------------------------------------------|
+|oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo| <- stat points
+------------------------------------------------------------------
+ ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||  <- child node pointers
+ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+```
+
+A __statistical point__ represents a 1/64 slice of its parent's time slot. It
+holds the min/max/mean/count of all points inside its time slot, and points to a
+new node holding extra details.  When a vector node is first converted to a core
+node, the raw points are pushed into new vector nodes pointed to by the new
+statistical points.
 
 | level | node width                       | stat points per node | stat point width                 |
 |:------|:---------------------------------|:---------------------|:---------------------------------|
@@ -86,10 +119,10 @@ below it to retain a summary at its given resolution.
 | 10    | 2<sup>8</sup> ns   (256 ns)      | 64                   | 2<sup>2</sup> ns   (4 ns)        |
 | 11    | 2<sup>2</sup> ns   (4 ns)        | 64                   | (no stat points at bottom)       |
 
-Therefore, the sampling rate of the data at different moments will determine how
-deep the tree will be during those slices of time. Regardless of the depth of
-the actual data, the time spent querying at some higher level (lower resolution)
-will remain fixed (quick) due to summaries provided by parent nodes.
+The sampling rate of the data at different moments will determine how deep the
+tree will be during those slices of time. Regardless of the depth of the actual
+data, the time spent querying at some higher level (lower resolution) will
+remain fixed (quick) due to summaries provided by parent nodes.
 
 ...
 
