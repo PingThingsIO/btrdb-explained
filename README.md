@@ -64,27 +64,27 @@ BTrDB stores its data in a time-partitioned tree, with a branching factor of 64.
 The root node covers ~146 years. Bottom nodes (only ten levels down) cover 4ns
 each.
 
-Each child node holds a list of raw points until exceeding its capacity of 64.
-Once full, the points are pushed further down the tree into new levels of
-time-partitioned child nodes. The parent node stores statistical information
-about all points below it to retain a summary at its given resolution.
+Each child node holds a vector of raw points at a capacity of 1024. This is
+called a __vector node__.  Once full, this vector node is converted to a __core
+node__ by time-partitioning itself into 64 "statistical" points, each now
+pointing to a new vector node. The "raw" points are then pushed into the
+appropriate new vector nodes depending on its timestamp. The statistical points
+at the parent of each new child node stores the min/max/mean/count of all points
+below it to retain a summary at its given resolution.
 
-| level | node width                       | points\* per node | statistical point width          |
-|:------|:---------------------------------|:------------------|:---------------------------------|
-| 1     | 2<sup>62</sup> ns  (~146 years)  | 64                | 2<sup>56</sup> ns  (~2.28 years) |
-| 2     | 2<sup>56</sup> ns  (~2.28 years) | 64                | 2<sup>50</sup> ns  (~13.03 days) |
-| 3     | 2<sup>50</sup> ns  (~13.03 days) | 64                | 2<sup>44</sup> ns  (~4.88 hours) |
-| 4     | 2<sup>44</sup> ns  (~4.88 hours) | 64                | 2<sup>38</sup> ns  (~4.58 min)   |
-| 5     | 2<sup>38</sup> ns  (~4.58 min)   | 64                | 2<sup>32</sup> ns  (~4.29 s)     |
-| 6     | 2<sup>32</sup> ns  (~4.29 s)     | 64                | 2<sup>26</sup> ns  (~67.11 ms)   |
-| 7     | 2<sup>26</sup> ns  (~67.11 ms)   | 64                | 2<sup>20</sup> ns  (~1.05 ms)    |
-| 8     | 2<sup>20</sup> ns  (~1.05 ms)    | 64                | 2<sup>14</sup> ns  (~16.38 µs)   |
-| 9     | 2<sup>14</sup> ns  (~16.38 µs)   | 64                | 2<sup>8</sup> ns   (256 ns)      |
-| 10    | 2<sup>8</sup> ns   (256 ns)      | 64                | 2<sup>2</sup> ns   (4 ns)        |
-| 11    | 2<sup>2</sup> ns   (4 ns)        | 64                | (no stat points at bottom)       |
-
-_\* a "point" is either a raw data point or a statistical summary of all those
-beneath it in the tree_
+| level | node width                       | stat points per node | stat point width                 |
+|:------|:---------------------------------|:---------------------|:---------------------------------|
+| 1     | 2<sup>62</sup> ns  (~146 years)  | 64                   | 2<sup>56</sup> ns  (~2.28 years) |
+| 2     | 2<sup>56</sup> ns  (~2.28 years) | 64                   | 2<sup>50</sup> ns  (~13.03 days) |
+| 3     | 2<sup>50</sup> ns  (~13.03 days) | 64                   | 2<sup>44</sup> ns  (~4.88 hours) |
+| 4     | 2<sup>44</sup> ns  (~4.88 hours) | 64                   | 2<sup>38</sup> ns  (~4.58 min)   |
+| 5     | 2<sup>38</sup> ns  (~4.58 min)   | 64                   | 2<sup>32</sup> ns  (~4.29 s)     |
+| 6     | 2<sup>32</sup> ns  (~4.29 s)     | 64                   | 2<sup>26</sup> ns  (~67.11 ms)   |
+| 7     | 2<sup>26</sup> ns  (~67.11 ms)   | 64                   | 2<sup>20</sup> ns  (~1.05 ms)    |
+| 8     | 2<sup>20</sup> ns  (~1.05 ms)    | 64                   | 2<sup>14</sup> ns  (~16.38 µs)   |
+| 9     | 2<sup>14</sup> ns  (~16.38 µs)   | 64                   | 2<sup>8</sup> ns   (256 ns)      |
+| 10    | 2<sup>8</sup> ns   (256 ns)      | 64                   | 2<sup>2</sup> ns   (4 ns)        |
+| 11    | 2<sup>2</sup> ns   (4 ns)        | 64                   | (no stat points at bottom)       |
 
 Therefore, the sampling rate of the data at different moments will determine how
 deep the tree will be during those slices of time. Regardless of the depth of
