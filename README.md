@@ -39,7 +39,7 @@ In under _200ms_, it can query a year of data at nanosecond-precision (2.1
 trillion points) at any desired window—returning statistical summary points at any
 desired resolution (containing a min/max/mean per point).
 
-![zoom](https://user-images.githubusercontent.com/116838/34006003-6e753618-e0c2-11e7-91bc-65a1cda3cbe7.gif)
+![zoom](https://user-images.githubusercontent.com/116838/34450616-5090c8a2-ecd3-11e7-8722-f5d7f131e909.gif)
 
 **High compression**
 
