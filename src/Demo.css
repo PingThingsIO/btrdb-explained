@@ -1,0 +1,59 @@
+.Demo {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+}
+
+.Demo-sidebar {
+  background: #e7e8e9;
+  width: 288px;
+}
+
+.Demo-sidebar header {
+  padding: 32px;
+  text-align: center;
+}
+
+.Demo-logo {
+  width: 178px;
+}
+
+.Demo-version {
+  background: #1eb7aa;
+  color: #fff;
+  text-align: center;
+  padding: 24px;
+  font-family: "Fira Code", monospace;
+  font-size: 14px;
+}
+
+.Demo-notes {
+  font-family: "Roboto", sans-serif;
+  padding-left: 38px;
+  font-size: 14px;
+  color: #6c6e6e;
+}
+
+.Demo-notes p {
+  margin-top: 2em;
+  margin-right: 2em;
+  margin-bottom: 2em;
+  line-height: 1.6em;
+}
+
+.Demo-notes h3 {
+  font-size: 18px;
+  font-weight: normal;
+  color: #454545;
+}
+
+.Demo-notes li {
+  margin-top: 0.2em;
+  line-height: 1.6em;
+}
+
+.Demo-body {
+  padding-left: 48px;
+  padding-top: 48px;
+}
