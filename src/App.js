@@ -1,8 +1,8 @@
 import React, { Component } from "react";
 import * as d3scale from "d3-scale";
-import * as d3ease from "d3-ease";
-import * as d3transition from "d3-transition";
-import * as d3shape from "d3-shape";
+// import * as d3ease from "d3-ease";
+// import * as d3transition from "d3-transition";
+// import * as d3shape from "d3-shape";
 import "./App.css";
 
 class App extends Component {
@@ -16,14 +16,18 @@ class App extends Component {
         level: null,
         cell: null
       },
-      path: [4, 2, 3, 3, 8, 9, 5, 1, 0, 6],
+      path: [],
       pathAnim: 1,
       cellW: 8,
       cellH: 12,
       treeX: 40,
       treeY: 20,
-      padLevels: 5
+      levelOffset: 5
     };
+    for (let i = 0; i < 10; i++) {
+      this.state.path.push(Math.floor(Math.random() * this.state.numCells));
+    }
+    this.state.pathAnim = this.state.path.length;
     this.createD3Objects();
   }
   componentWillMount() {
@@ -36,66 +40,103 @@ class App extends Component {
     this.d3 = {};
   };
   computeDerivedState = (props, state) => {
-    const { padLevels, cellH } = state;
+    const { cellW, cellH } = state;
 
     const pixelRatio = window.devicePixelRatio || 1;
-    const levelOffset = (padLevels + 1) * cellH;
+
+    const cellX = d3scale
+      .scaleLinear()
+      .domain([0, 1])
+      .range([0, cellW]);
+    const cellY = d3scale
+      .scaleLinear()
+      .domain([0, 1])
+      .range([0, cellH]);
+
     this.ds = {
       pixelRatio,
-      levelOffset
+      cellX,
+      cellY
     };
   };
   drawCell = (ctx, level, cell) => {
-    const { cellH, cellW } = this.state;
+    const { cellH, cellW, path } = this.state;
+    const child = path[level + 1];
+    ctx.globalAlpha = child === cell ? 1 : 0.1;
     ctx.strokeRect(0, 0, cellW, cellH);
   };
   drawNode = (ctx, level) => {
-    const { numCells, cellW, cellH, path, padLevels, pathAnim } = this.state;
-    const { levelOffset } = this.ds;
-
-    if (pathAnim < level) return;
-    ctx.save();
+    const { numCells, cellW, cellH, path, levelOffset, pathAnim } = this.state;
     const parent = path[level];
 
-    const maxW = numCells * cellW;
+    const { cellX, cellY } = this.ds;
 
-    const domain = [level, level + 1];
-    const scaleW = d3scale
+    const t = d3scale
+      .scaleLinear()
+      .domain([level, level + 1])
+      .range([0, 1])
+      .clamp(true)(pathAnim);
+
+    if (t === 0) return;
+
+    const dip = 1 / levelOffset;
+
+    const domain = [0, dip, 1];
+    const scaleX0 = d3scale
       .scaleLinear()
       .domain(domain)
-      .range([cellW, maxW])
+      .range([cellX(parent), cellX(parent), cellX(0)])
       .clamp(true);
-    const scaleX = d3scale
+    const scaleX1 = d3scale
       .scaleLinear()
       .domain(domain)
-      .range([cellW * parent, 0])
+      .range([cellX(parent + 1), cellX(parent + 1), cellX(numCells)])
       .clamp(true);
     const scaleY = d3scale
       .scaleLinear()
       .domain(domain)
-      .range([-levelOffset, 0])
+      .range([cellY(-levelOffset), cellY(-levelOffset * (1 - dip)), cellY(0)])
       .clamp(true);
 
-    ctx.translate(scaleX(pathAnim), scaleY(pathAnim));
-    const w = scaleW(pathAnim);
-    if (w !== maxW) {
-      ctx.strokeRect(0, 0, w, cellH);
-    } else {
+    const x0 = scaleX0(t);
+    const x1 = scaleX1(t);
+    const y = scaleY(t);
+    const w = x1 - x0;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(80,100,120, 0.15)";
+    if (level > 0 && t > dip) {
+      const ytop = scaleY(0) + cellH + 1;
+      ctx.beginPath();
+      ctx.moveTo(scaleX0(0), ytop);
+      ctx.lineTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.lineTo(scaleX1(0), ytop);
+      ctx.fill();
+    }
+
+    ctx.translate(x0, y);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, cellH);
+    ctx.strokeStyle = "#555";
+    if (t === 1) {
+      ctx.save();
       for (let cell = 0; cell < numCells; cell++) {
         this.drawCell(ctx, level, cell);
         ctx.translate(cellW, 0);
       }
+      ctx.restore();
     }
+    ctx.strokeRect(0, 0, w, cellH);
     ctx.restore();
   };
   drawTree = ctx => {
     ctx.save();
-    const { treeX, treeY, cellH, path } = this.state;
-    const { levelOffset } = this.ds;
+    const { treeX, treeY, cellH, levelOffset, path } = this.state;
     ctx.translate(treeX, treeY);
     for (let level = 0; level < path.length; level++) {
       this.drawNode(ctx, level);
-      ctx.translate(0, levelOffset);
+      ctx.translate(0, cellH * levelOffset);
     }
     ctx.restore();
   };
