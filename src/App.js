@@ -12,13 +12,23 @@ class App extends Component {
         level: null,
         cell: null
       },
-      path: [],
-      pathAnim: [],
-      cellW: 10,
-      cellH: 10,
+      nodes: [
+        { depth: 0, i: 4, t: 1 },
+        { depth: 1, i: 2, t: 1 },
+        { depth: 2, i: 3, t: 1 },
+        { depth: 3, i: 3, t: 1 },
+        { depth: 4, i: 8, t: 1 },
+        { depth: 5, i: 9, t: 1 },
+        { depth: 6, i: 5, t: 1 },
+        { depth: 7, i: 1, t: 1 },
+        { depth: 8, i: 0, t: 1 },
+        { depth: 9, i: 6, t: 1 }
+      ],
+      cellW: 8,
+      cellH: 12,
       treeX: 100,
       treeY: 100,
-      treePad: 32
+      treePad: 48
     };
   }
   componentWillMount() {
@@ -33,8 +43,28 @@ class App extends Component {
       pixelRatio
     };
   };
+  drawCell = (ctx, node, cell) => {
+    const { cellH, cellW } = this.state;
+    ctx.strokeRect(0, 0, cellW, cellH);
+  };
+  drawNode = (ctx, node) => {
+    const { numCells, cellW } = this.state;
+    ctx.save();
+    for (let cell = 0; cell < numCells; cell++) {
+      this.drawCell(ctx, node, cell);
+      ctx.translate(cellW, 0);
+    }
+    ctx.restore();
+  };
   drawTree = ctx => {
-    // TODO: draw tree
+    ctx.save();
+    const { treeX, treeY, treePad, cellH, nodes } = this.state;
+    ctx.translate(treeX, treeY);
+    for (let node of nodes) {
+      this.drawNode(ctx, node);
+      ctx.translate(0, cellH + treePad);
+    }
+    ctx.restore();
   };
   draw = canvas => {
     if (!canvas) return;
