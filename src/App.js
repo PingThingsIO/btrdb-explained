@@ -1,4 +1,8 @@
 import React, { Component } from "react";
+import * as d3scale from "d3-scale";
+import * as d3ease from "d3-ease";
+import * as d3transition from "d3-transition";
+import * as d3shape from "d3-shape";
 import "./App.css";
 
 class App extends Component {
@@ -13,13 +17,14 @@ class App extends Component {
         cell: null
       },
       path: [4, 2, 3, 3, 8, 9, 5, 1, 0, 6],
-      pathAnim: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      pathAnim: 1,
       cellW: 8,
       cellH: 12,
       treeX: 40,
       treeY: 20,
       treePad: 48
     };
+    this.createD3Objects();
   }
   componentWillMount() {
     this.computeDerivedState(this.props, this.state);
@@ -27,6 +32,9 @@ class App extends Component {
   componentWillUpdate(nextProps, nextState) {
     this.computeDerivedState(nextProps, nextState);
   }
+  createD3Objects = () => {
+    this.d3 = {};
+  };
   computeDerivedState = (props, state) => {
     const pixelRatio = window.devicePixelRatio || 1;
     this.ds = {
@@ -38,11 +46,39 @@ class App extends Component {
     ctx.strokeRect(0, 0, cellW, cellH);
   };
   drawNode = (ctx, level) => {
-    const { numCells, cellW } = this.state;
+    const { numCells, cellW, cellH, path, treePad, pathAnim } = this.state;
+    if (pathAnim < level) return;
     ctx.save();
-    for (let cell = 0; cell < numCells; cell++) {
-      this.drawCell(ctx, level, cell);
-      ctx.translate(cellW, 0);
+    const parent = path[level];
+
+    const maxW = numCells * cellW;
+
+    const domain = [level, level + 1];
+    const scaleW = d3scale
+      .scaleLinear()
+      .domain(domain)
+      .range([cellW, maxW])
+      .clamp(true);
+    const scaleX = d3scale
+      .scaleLinear()
+      .domain(domain)
+      .range([cellW * parent, 0])
+      .clamp(true);
+    const scaleY = d3scale
+      .scaleLinear()
+      .domain(domain)
+      .range([-treePad - cellH, 0])
+      .clamp(true);
+
+    ctx.translate(scaleX(pathAnim), scaleY(pathAnim));
+    const w = scaleW(pathAnim);
+    if (w !== maxW) {
+      ctx.strokeRect(0, 0, w, cellH);
+    } else {
+      for (let cell = 0; cell < numCells; cell++) {
+        this.drawCell(ctx, level, cell);
+        ctx.translate(cellW, 0);
+      }
     }
     ctx.restore();
   };
@@ -67,6 +103,18 @@ class App extends Component {
     this.drawTree(ctx);
     ctx.restore();
   };
+  onMouseMove = e => {
+    const y = e.pageY;
+    const { height, path } = this.state;
+    const pad = 40;
+    const scale = d3scale
+      .scaleLinear()
+      .domain([pad, height - pad])
+      .range([1, path.length])
+      .clamp(true);
+    const t = scale(y);
+    this.setState({ pathAnim: t });
+  };
   render() {
     const { width, height } = this.state;
     const { pixelRatio } = this.ds;
@@ -76,6 +124,7 @@ class App extends Component {
         width={width * pixelRatio}
         height={height * pixelRatio}
         style={{ width: `${width}px`, height: `${height}px` }}
+        onMouseMove={this.onMouseMove}
       />
     );
   }
