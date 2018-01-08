@@ -22,7 +22,7 @@ class App extends Component {
       cellH: 12,
       treeX: 40,
       treeY: 20,
-      treePad: 48
+      padLevels: 5
     };
     this.createD3Objects();
   }
@@ -36,9 +36,13 @@ class App extends Component {
     this.d3 = {};
   };
   computeDerivedState = (props, state) => {
+    const { padLevels, cellH } = state;
+
     const pixelRatio = window.devicePixelRatio || 1;
+    const levelOffset = (padLevels + 1) * cellH;
     this.ds = {
-      pixelRatio
+      pixelRatio,
+      levelOffset
     };
   };
   drawCell = (ctx, level, cell) => {
@@ -46,7 +50,9 @@ class App extends Component {
     ctx.strokeRect(0, 0, cellW, cellH);
   };
   drawNode = (ctx, level) => {
-    const { numCells, cellW, cellH, path, treePad, pathAnim } = this.state;
+    const { numCells, cellW, cellH, path, padLevels, pathAnim } = this.state;
+    const { levelOffset } = this.ds;
+
     if (pathAnim < level) return;
     ctx.save();
     const parent = path[level];
@@ -67,7 +73,7 @@ class App extends Component {
     const scaleY = d3scale
       .scaleLinear()
       .domain(domain)
-      .range([-treePad - cellH, 0])
+      .range([-levelOffset, 0])
       .clamp(true);
 
     ctx.translate(scaleX(pathAnim), scaleY(pathAnim));
@@ -84,11 +90,12 @@ class App extends Component {
   };
   drawTree = ctx => {
     ctx.save();
-    const { treeX, treeY, treePad, cellH, path } = this.state;
+    const { treeX, treeY, cellH, path } = this.state;
+    const { levelOffset } = this.ds;
     ctx.translate(treeX, treeY);
     for (let level = 0; level < path.length; level++) {
       this.drawNode(ctx, level);
-      ctx.translate(0, cellH + treePad);
+      ctx.translate(0, levelOffset);
     }
     ctx.restore();
   };
