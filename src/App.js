@@ -5,8 +5,8 @@ class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      width: 1024,
-      height: 800,
+      width: 600,
+      height: 600,
       numCells: 64,
       hover: {
         level: null,
@@ -16,8 +16,8 @@ class App extends Component {
       pathAnim: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       cellW: 8,
       cellH: 12,
-      treeX: 100,
-      treeY: 100,
+      treeX: 40,
+      treeY: 20,
       treePad: 48
     };
   }
@@ -76,8 +76,6 @@ class App extends Component {
         width={width * pixelRatio}
         height={height * pixelRatio}
         style={{ width: `${width}px`, height: `${height}px` }}
-        onMouseMove={() => console.log("move")}
-        onClick={() => console.log("click")}
       />
     );
   }
