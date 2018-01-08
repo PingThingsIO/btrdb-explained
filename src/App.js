@@ -12,18 +12,8 @@ class App extends Component {
         level: null,
         cell: null
       },
-      nodes: [
-        { depth: 0, i: 4, t: 1 },
-        { depth: 1, i: 2, t: 1 },
-        { depth: 2, i: 3, t: 1 },
-        { depth: 3, i: 3, t: 1 },
-        { depth: 4, i: 8, t: 1 },
-        { depth: 5, i: 9, t: 1 },
-        { depth: 6, i: 5, t: 1 },
-        { depth: 7, i: 1, t: 1 },
-        { depth: 8, i: 0, t: 1 },
-        { depth: 9, i: 6, t: 1 }
-      ],
+      path: [4, 2, 3, 3, 8, 9, 5, 1, 0, 6],
+      pathAnim: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       cellW: 8,
       cellH: 12,
       treeX: 100,
@@ -43,25 +33,25 @@ class App extends Component {
       pixelRatio
     };
   };
-  drawCell = (ctx, node, cell) => {
+  drawCell = (ctx, level, cell) => {
     const { cellH, cellW } = this.state;
     ctx.strokeRect(0, 0, cellW, cellH);
   };
-  drawNode = (ctx, node) => {
+  drawNode = (ctx, level) => {
     const { numCells, cellW } = this.state;
     ctx.save();
     for (let cell = 0; cell < numCells; cell++) {
-      this.drawCell(ctx, node, cell);
+      this.drawCell(ctx, level, cell);
       ctx.translate(cellW, 0);
     }
     ctx.restore();
   };
   drawTree = ctx => {
     ctx.save();
-    const { treeX, treeY, treePad, cellH, nodes } = this.state;
+    const { treeX, treeY, treePad, cellH, path } = this.state;
     ctx.translate(treeX, treeY);
-    for (let node of nodes) {
-      this.drawNode(ctx, node);
+    for (let level = 0; level < path.length; level++) {
+      this.drawNode(ctx, level);
       ctx.translate(0, cellH + treePad);
     }
     ctx.restore();
