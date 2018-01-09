@@ -9,7 +9,7 @@ class Viz extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      width: 600,
+      width: 640,
       height: 600,
       numCells: 64,
       hover: {
@@ -67,12 +67,16 @@ class Viz extends Component {
     let res = rootResolution;
     const timeX = [];
     for (let i = 0; i < path.length; i++) {
-      start += pw(res) * path[i];
+      const end = start + pw(res) * numCells;
+      console.log(i, path[i], new Date(start / 1e6), new Date(end / 1e6));
       timeX.push(
         scaleTimeNano()
-          .domain([start, start + pw(res) * numCells])
+          .domain([start, end])
           .range([0, cellW * numCells])
       );
+      if (i + 1 < path.length) {
+        start += pw(res) * path[i + 1];
+      }
       res -= 6;
     }
 
@@ -88,6 +92,11 @@ class Viz extends Component {
     const child = path[level + 1];
     ctx.globalAlpha = child === cell ? 1 : 0.1;
     ctx.strokeRect(0, 0, cellW, cellH);
+    if (child === cell) {
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillStyle = "rgba(80,100,120, 0.15)";
+      ctx.fillRect(0, 0, cellW, cellH);
+    }
   };
   drawNode = (ctx, level) => {
     const { numCells, cellW, cellH, path, levelOffset, pathAnim } = this.state;
@@ -174,23 +183,69 @@ class Viz extends Component {
     // Draw outer border
     ctx.strokeRect(0, 0, w, cellH);
 
-    // Draw ticks
+    // Tick font
+    ctx.font = "10px sans-serif";
+    ctx.textBaseline = "bottom";
+    ctx.textAlign = "center";
+
+    // Draw the major _unix epoch_ and _now_ ticks
     if (level === 0) {
-      const tick = (t, color, title) => {
+      const drawTick = (t, color, title) => {
+        const x = timeX[level](t);
+        if (x < 0 || x > cellX(numCells)) return;
         ctx.strokeStyle = color;
         ctx.fillStyle = color;
         ctx.beginPath();
-        const x = timeX[level](t);
-        ctx.moveTo(x, cellY(-1));
+        ctx.moveTo(x, cellY(-0.7));
         ctx.lineTo(x, cellY(1));
         ctx.stroke();
-        ctx.font = "10px sans-serif";
-        ctx.textBaseline = "bottom";
-        ctx.textAlign = "center";
-        ctx.fillText(title, x, cellY(-1.5));
+        ctx.fillText(title, x, cellY(-2));
       };
-      tick(0, "#1eb7aa", "unix epoch");
-      tick(+new Date() * 1e6, "#db7b35", "now");
+      drawTick(0, "#1eb7aa", "unix epoch");
+      drawTick(+new Date() * 1e6, "#db7b35", "now");
+    }
+
+    // Draw the date ticks
+    if (t === 1) {
+      ctx.strokeStyle = ctx.fillStyle = "rgba(90,110,100, 0.5)";
+      const drawTick = (t, title) => {
+        const x = timeX[level](t);
+        ctx.beginPath();
+        ctx.moveTo(x, cellY(0));
+        ctx.lineTo(x, cellY(-0.5));
+        ctx.stroke();
+        ctx.fillText(title, x, cellY(-0.75));
+      };
+      const count = 8;
+      const ticks = timeX[level].ticks(count);
+      const tickFormat = timeX[level].tickFormat(count);
+      for (let i = 0; i < ticks.length; i++) {
+        const tickTime = ticks[i];
+        // nanosecond ticks sometimes duplicate
+        if (ticks[i] !== ticks[i - 1]) {
+          drawTick(tickTime, tickFormat(tickTime));
+        }
+      }
+    }
+
+    // Draw the node length
+    if (t === 1) {
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      const labels = [
+        "146 years",
+        "2.28 years",
+        "13.03 days",
+        "4.88 hours",
+        "4.58 min",
+        "4.29 s",
+        "67.11 ms",
+        "1.05 ms",
+        "16.38 µs",
+        "256 ns",
+        "4 ns"
+      ];
+      ctx.fillText(labels[level], x1 + 28, cellY(0.5));
     }
 
     ctx.restore();
