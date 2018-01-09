@@ -1,3 +1,12 @@
+## v2018.01.08
+
+[screenshot][screenshot-2018-01-08] | [demo permalink][demo-2018-01-08]
+
+- Add date and time annotations
+
+[screenshot-2018-01-08]:https://user-images.githubusercontent.com/116838/34710929-d4f974e2-f4e2-11e7-8ccf-87fda093b2a5.gif
+[demo-2018-01-08]:http://btrdb-viz-2018-01-08.surge.sh/
+
 ## v2018.01.07
 
 [screenshot][screenshot-2018-01-07] | [demo permalink][demo-2018-01-07]
