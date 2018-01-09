@@ -49,10 +49,13 @@ class Viz extends Component {
 
     const pixelRatio = window.devicePixelRatio || 1;
 
+    // maps cell number to its x position
     const cellX = d3scale
       .scaleLinear()
       .domain([0, 1])
       .range([0, cellW]);
+
+    // maps cell number to its y position
     const cellY = d3scale
       .scaleLinear()
       .domain([0, 1])
@@ -88,43 +91,57 @@ class Viz extends Component {
   };
   drawNode = (ctx, level) => {
     const { numCells, cellW, cellH, path, levelOffset, pathAnim } = this.state;
-    const parent = path[level];
-
     const { cellX, cellY, timeX } = this.ds;
 
+    // index of the parent
+    // (where in the previous level our node is coming from)
+    const parent = path[level];
+
+    // `t` controls the animation of this node
     const t = d3scale
       .scaleLinear()
       .domain([level, level + 1])
       .range([0, 1])
       .clamp(true)(pathAnim);
 
+    // do not draw if pathAnim has not reached our level
     if (t === 0) return;
 
+    // `dip` is how long `t` will spend dropping the node before expanding it.
     const dip = 1 / levelOffset;
 
     const domain = [0, dip, 1];
+
+    // left side
     const scaleX0 = d3scale
       .scaleLinear()
       .domain(domain)
       .range([cellX(parent), cellX(parent), cellX(0)])
       .clamp(true);
+
+    // right side
     const scaleX1 = d3scale
       .scaleLinear()
       .domain(domain)
       .range([cellX(parent + 1), cellX(parent + 1), cellX(numCells)])
       .clamp(true);
+
+    // top side
     const scaleY = d3scale
       .scaleLinear()
       .domain(domain)
       .range([cellY(-levelOffset), cellY(-levelOffset * (1 - dip)), cellY(0)])
       .clamp(true);
 
+    // compute
     const x0 = scaleX0(t);
     const x1 = scaleX1(t);
     const y = scaleY(t);
     const w = x1 - x0;
 
     ctx.save();
+
+    // Draw zooming cone that connects previous level to this one
     ctx.fillStyle = "rgba(80,100,120, 0.15)";
     if (level > 0 && t > dip) {
       const ytop = scaleY(0) + cellH + 1;
@@ -136,10 +153,14 @@ class Viz extends Component {
       ctx.fill();
     }
 
+    // Translate to the topleft corner of box
     ctx.translate(x0, y);
 
+    // Make opaque
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, w, cellH);
+
+    // Draw inner cells
     ctx.strokeStyle = "#555";
     if (t === 1) {
       ctx.save();
@@ -149,8 +170,11 @@ class Viz extends Component {
       }
       ctx.restore();
     }
+
+    // Draw outer border
     ctx.strokeRect(0, 0, w, cellH);
 
+    // Draw ticks
     if (level === 0) {
       const tick = (t, color, title) => {
         ctx.strokeStyle = color;
