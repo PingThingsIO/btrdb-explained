@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import * as d3scale from "d3-scale";
+import { scaleTimeNano } from "./scaleTimeNano";
 // import * as d3ease from "d3-ease";
 // import * as d3transition from "d3-transition";
 // import * as d3shape from "d3-shape";
@@ -15,15 +16,20 @@ class Viz extends Component {
         level: null,
         cell: null
       },
-      path: [],
+      path: [0],
       pathAnim: 1,
       cellW: 8,
       cellH: 12,
       treeX: 40,
-      treeY: 20,
-      levelOffset: 5
+      treeY: 40,
+      levelOffset: 5,
+
+      calendarCellSize: 15,
+
+      rootStart: -1152921504606846976,
+      rootResolution: 56
     };
-    for (let i = 0; i < 10; i++) {
+    for (let i = 1; i < 10; i++) {
       this.state.path.push(Math.floor(Math.random() * this.state.numCells));
     }
     this.state.pathAnim = this.state.path.length;
@@ -39,7 +45,7 @@ class Viz extends Component {
     this.d3 = {};
   };
   computeDerivedState = (props, state) => {
-    const { cellW, cellH } = state;
+    const { cellW, cellH, path, rootStart, rootResolution, numCells } = state;
 
     const pixelRatio = window.devicePixelRatio || 1;
 
@@ -52,10 +58,26 @@ class Viz extends Component {
       .domain([0, 1])
       .range([0, cellH]);
 
+    // compute scale for each level
+    const pw = res => Math.pow(2, res);
+    let start = rootStart;
+    let res = rootResolution;
+    const timeX = [];
+    for (let i = 0; i < path.length; i++) {
+      start += pw(res) * path[i];
+      timeX.push(
+        scaleTimeNano()
+          .domain([start, start + pw(res) * numCells])
+          .range([0, cellW * numCells])
+      );
+      res -= 6;
+    }
+
     this.ds = {
       pixelRatio,
       cellX,
-      cellY
+      cellY,
+      timeX
     };
   };
   drawCell = (ctx, level, cell) => {
@@ -68,7 +90,7 @@ class Viz extends Component {
     const { numCells, cellW, cellH, path, levelOffset, pathAnim } = this.state;
     const parent = path[level];
 
-    const { cellX, cellY } = this.ds;
+    const { cellX, cellY, timeX } = this.ds;
 
     const t = d3scale
       .scaleLinear()
@@ -115,6 +137,7 @@ class Viz extends Component {
     }
 
     ctx.translate(x0, y);
+
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, w, cellH);
     ctx.strokeStyle = "#555";
@@ -127,6 +150,25 @@ class Viz extends Component {
       ctx.restore();
     }
     ctx.strokeRect(0, 0, w, cellH);
+
+    if (level === 0) {
+      const tick = (t, color, title) => {
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        const x = timeX[level](t);
+        ctx.moveTo(x, cellY(-1));
+        ctx.lineTo(x, cellY(1));
+        ctx.stroke();
+        ctx.font = "10px sans-serif";
+        ctx.textBaseline = "bottom";
+        ctx.textAlign = "center";
+        ctx.fillText(title, x, cellY(-1.5));
+      };
+      tick(0, "#1eb7aa", "unix epoch");
+      tick(+new Date() * 1e6, "#db7b35", "now");
+    }
+
     ctx.restore();
   };
   drawTree = ctx => {
@@ -138,6 +180,15 @@ class Viz extends Component {
       ctx.translate(0, cellH * levelOffset);
     }
     ctx.restore();
+  };
+  drawCalendar = ctx => {
+    const { pathAnim } = this.state;
+    // pick a center
+    const t = pathAnim % 1;
+    // get index of the child
+    // get x,y of the child
+    // translate toward x,y
+    // ctx.translate()
   };
   draw = canvas => {
     if (!canvas) return;
