@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import * as d3scale from "d3-scale";
 import { scaleTimeNano } from "./scaleTimeNano";
+import * as d3interpolate from "d3-interpolate";
 // import * as d3ease from "d3-ease";
 // import * as d3transition from "d3-transition";
 // import * as d3shape from "d3-shape";
@@ -281,6 +282,22 @@ class Viz extends Component {
     const s = this.state.calendarCellSize;
     ctx.strokeRect(0, 0, s, s);
   };
+  drawCalendarNode = (ctx, level) => {
+    const n = this.state.numSquareCells;
+    const s = this.state.calendarCellSize;
+    let cell = 0;
+    ctx.save();
+    for (let cy = 0; cy < n; cy++) {
+      ctx.save();
+      for (let cx = 0; cx < n; cx++) {
+        this.drawCalendarCell(ctx, level, cell++);
+        ctx.translate(s, 0);
+      }
+      ctx.restore();
+      ctx.translate(0, s);
+    }
+    ctx.restore();
+  };
   drawCalendar = ctx => {
     const {
       path,
@@ -288,34 +305,47 @@ class Viz extends Component {
       numSquareCells,
       calendarCellSize,
       calendarX,
-      calendarY,
-      levelOffset
+      calendarY
     } = this.state;
     const { dipTime } = this.ds;
-
-    let t = d3scale
-      .scaleLinear()
-      .domain([dipTime, 1])
-      .range([0, 1])
-      .clamp(true)(pathAnim % 1);
-
-    let level = path[Math.floor(pathAnim)];
-    if (level == null) {
-      level = path[path.length - 1];
-      t = 1;
-    }
-    const cellX = level % numSquareCells;
-    const cellY = Math.floor(level / numSquareCells);
 
     const s = calendarCellSize;
     const n = numSquareCells;
 
+    const t = pathAnim % 1;
+
+    // time used to control the camera
+    let camT = d3scale
+      .scaleLinear()
+      .domain([dipTime, 1])
+      .range([0, 1])
+      .clamp(true)(t);
+
+    // time used to control the child highlight border
+    let highlightT = d3scale
+      .scaleLinear()
+      .domain([0, dipTime / 2])
+      .range([0, 1])
+      .clamp(true)(t);
+
+    let level = path[Math.floor(pathAnim)];
+
+    // edge case for last path
+    if (level == null) {
+      level = path[path.length - 1];
+      camT = 1;
+      highlightT = 1;
+    }
+
+    const cellX = level % n;
+    const cellY = Math.floor(level / n);
+
     const [x, y, scale] = d3scale
       .scaleLinear()
       .domain([0, 1])
-      .range([[cellX * s, cellY * s, 1], [0, 0, n]])(t);
+      .range([[cellX * s, cellY * s, 1], [0, 0, n]])(camT);
 
-    ctx.save();
+    ctx.save(); // 1
     ctx.translate(calendarX, calendarY);
 
     // clip window
@@ -323,7 +353,7 @@ class Viz extends Component {
     ctx.rect(-1, -1, s * n + 2, s * n + 2);
     ctx.clip();
 
-    ctx.save();
+    ctx.save(); // 2
 
     // transform camera
     ctx.translate(x, y);
@@ -332,51 +362,32 @@ class Viz extends Component {
 
     // keep 1px line width
     ctx.lineWidth = 1 / scale;
-    ctx.strokeStyle = d3scale
-      .scaleLinear()
-      .domain([0, 1])
-      .range(["#fff", "#555"])(0.3);
+    const gridColor = d3interpolate.interpolate("#fff", "#555")(0.3);
+    ctx.strokeStyle = gridColor;
 
     // draw parent
-    let cell = 0;
-    ctx.save();
-    for (let cy = 0; cy < numSquareCells; cy++) {
-      ctx.save();
-      for (let cx = 0; cx < numSquareCells; cx++) {
-        this.drawCalendarCell(ctx, level, cell);
-        ctx.translate(s, 0);
-      }
-      ctx.restore();
-      ctx.translate(0, s);
-    }
-    ctx.restore();
+    this.drawCalendarNode(ctx, level);
 
     // draw child
-    ctx.save();
+    ctx.save(); // 3
     ctx.translate(cellX * s, cellY * s);
-    const scale2 = 1 / numSquareCells;
+    const scale2 = 1 / n;
     ctx.lineWidth /= scale2;
-    ctx.globalAlpha *= Math.pow(t, 2);
     ctx.scale(scale2, scale2);
-    for (let cy = 0; cy < numSquareCells; cy++) {
-      ctx.save();
-      for (let cx = 0; cx < numSquareCells; cx++) {
-        this.drawCalendarCell(ctx, level, cell);
-        ctx.translate(s, 0);
-      }
-      ctx.restore();
-      ctx.translate(0, s);
-    }
-    ctx.restore();
-    ctx.strokeStyle = "#555";
+    ctx.globalAlpha *= d3interpolate.interpolate(0, 1)(Math.pow(camT, 2));
+    this.drawCalendarNode(ctx, level);
+    ctx.restore(); // 3
+
+    // highlight child
+    ctx.strokeStyle = d3interpolate.interpolate(gridColor, "#555")(highlightT);
     ctx.strokeRect(cellX * s, cellY * s, s, s);
 
     // outline window
-    ctx.restore();
+    ctx.restore(); // 2
     ctx.strokeStyle = "#555";
     ctx.strokeRect(0, 0, s * n, s * n);
 
-    ctx.restore();
+    ctx.restore(); // 1
   };
   draw = canvas => {
     if (!canvas) return;
