@@ -9,22 +9,27 @@ class Viz extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      width: 640,
+      // canvas
+      width: 1024,
       height: 600,
-      numCells: 64,
-      hover: {
-        level: null,
-        cell: null
-      },
+
+      numCells: 64, // cells in a tree row
+      numSquareCells: 8, // cells in a calendar row
+
       path: [0],
       pathAnim: 1,
+
+      // Tree placement and sizing
       cellW: 8,
       cellH: 12,
       treeX: 40,
       treeY: 40,
       levelOffset: 5,
 
-      calendarCellSize: 15,
+      // Tree placement and sizing
+      calendarCellSize: 40,
+      calendarX: 700,
+      calendarY: 40,
 
       rootStart: -1152921504606846976,
       rootResolution: 56
@@ -68,7 +73,6 @@ class Viz extends Component {
     const timeX = [];
     for (let i = 0; i < path.length; i++) {
       const end = start + pw(res) * numCells;
-      console.log(i, path[i], new Date(start / 1e6), new Date(end / 1e6));
       timeX.push(
         scaleTimeNano()
           .domain([start, end])
@@ -261,13 +265,58 @@ class Viz extends Component {
     ctx.restore();
   };
   drawCalendar = ctx => {
-    const { pathAnim } = this.state;
-    // pick a center
-    const t = pathAnim % 1;
-    // get index of the child
-    // get x,y of the child
-    // translate toward x,y
-    // ctx.translate()
+    const {
+      path,
+      pathAnim,
+      numSquareCells,
+      calendarCellSize,
+      calendarX,
+      calendarY
+    } = this.state;
+    let t = pathAnim % 1;
+
+    let index = path[Math.floor(pathAnim)];
+    if (index == null) {
+      index = path[path.length - 1];
+      t = 1;
+    }
+    const cellX = index % numSquareCells;
+    const cellY = Math.floor(index / numSquareCells);
+
+    const s = calendarCellSize;
+    const n = numSquareCells;
+
+    const [x, y, scale] = d3scale
+      .scaleLinear()
+      .domain([0, 1])
+      .range([[cellX * s, cellY * s, 1], [0, 0, n]])(t);
+
+    ctx.save();
+    ctx.translate(calendarX, calendarY);
+
+    // clip window
+    ctx.beginPath();
+    ctx.rect(-1, -1, s * n + 2, s * n + 2);
+    ctx.clip();
+
+    // outline window
+    ctx.strokeRect(0, 0, s * n, s * n);
+
+    // transform camera
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.translate(-cellX * s, -cellY * s);
+
+    // keep 1px line width
+    ctx.lineWidth = 1 / scale;
+
+    // draw parent
+    ctx.strokeRect(0, 0, s * n, s * n);
+
+    // draw child
+    ctx.strokeRect(cellX * s, cellY * s, s, s);
+
+    ctx.restore();
   };
   draw = canvas => {
     if (!canvas) return;
@@ -278,6 +327,7 @@ class Viz extends Component {
     ctx.scale(pixelRatio, pixelRatio);
     ctx.clearRect(0, 0, width, height);
     this.drawTree(ctx);
+    this.drawCalendar(ctx);
     ctx.restore();
   };
   onMouseMove = e => {
