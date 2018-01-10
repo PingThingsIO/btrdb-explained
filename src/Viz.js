@@ -104,7 +104,7 @@ class Viz extends Component {
       dipTime
     };
   };
-  drawCell = (ctx, level, cell) => {
+  drawTreeCell = (ctx, level, cell) => {
     const { cellH, cellW, path } = this.state;
     const child = path[level + 1];
     ctx.globalAlpha = child === cell ? 1 : 0.1;
@@ -115,7 +115,7 @@ class Viz extends Component {
       ctx.fillRect(0, 0, cellW, cellH);
     }
   };
-  drawNode = (ctx, level) => {
+  drawTreeNode = (ctx, level) => {
     const { numCells, cellW, cellH, path, levelOffset, pathAnim } = this.state;
     const { cellX, cellY, timeX, dipTime } = this.ds;
 
@@ -192,7 +192,7 @@ class Viz extends Component {
     if (t === 1) {
       ctx.save();
       for (let cell = 0; cell < numCells; cell++) {
-        this.drawCell(ctx, level, cell);
+        this.drawTreeCell(ctx, level, cell);
         ctx.translate(cellW, 0);
       }
       ctx.restore();
@@ -273,7 +273,7 @@ class Viz extends Component {
     const { treeX, treeY, cellH, levelOffset, path } = this.state;
     ctx.translate(treeX, treeY);
     for (let level = 0; level < path.length; level++) {
-      this.drawNode(ctx, level);
+      this.drawTreeNode(ctx, level);
       ctx.translate(0, cellH * levelOffset);
     }
     ctx.restore();
