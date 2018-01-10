@@ -356,7 +356,7 @@ class Viz extends Component {
     ctx.translate(cellX * s, cellY * s);
     const scale2 = 1 / numSquareCells;
     ctx.lineWidth /= scale2;
-    ctx.globalAlpha *= t;
+    ctx.globalAlpha *= Math.pow(t, 2);
     ctx.scale(scale2, scale2);
     for (let cy = 0; cy < numSquareCells; cy++) {
       ctx.save();
