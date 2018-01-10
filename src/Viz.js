@@ -50,7 +50,18 @@ class Viz extends Component {
     this.d3 = {};
   };
   computeDerivedState = (props, state) => {
-    const { cellW, cellH, path, rootStart, rootResolution, numCells } = state;
+    const {
+      cellW,
+      cellH,
+      path,
+      rootStart,
+      rootResolution,
+      numCells,
+      levelOffset
+    } = state;
+
+    // `dip` is how long `t` will spend dropping the node before expanding it.
+    const dipTime = 1 / levelOffset;
 
     const pixelRatio = window.devicePixelRatio || 1;
 
@@ -88,7 +99,8 @@ class Viz extends Component {
       pixelRatio,
       cellX,
       cellY,
-      timeX
+      timeX,
+      dipTime
     };
   };
   drawCell = (ctx, level, cell) => {
@@ -104,7 +116,7 @@ class Viz extends Component {
   };
   drawNode = (ctx, level) => {
     const { numCells, cellW, cellH, path, levelOffset, pathAnim } = this.state;
-    const { cellX, cellY, timeX } = this.ds;
+    const { cellX, cellY, timeX, dipTime } = this.ds;
 
     // index of the parent
     // (where in the previous level our node is coming from)
@@ -120,10 +132,7 @@ class Viz extends Component {
     // do not draw if pathAnim has not reached our level
     if (t === 0) return;
 
-    // `dip` is how long `t` will spend dropping the node before expanding it.
-    const dip = 1 / levelOffset;
-
-    const domain = [0, dip, 1];
+    const domain = [0, dipTime, 1];
 
     // left side
     const scaleX0 = d3scale
@@ -143,7 +152,11 @@ class Viz extends Component {
     const scaleY = d3scale
       .scaleLinear()
       .domain(domain)
-      .range([cellY(-levelOffset), cellY(-levelOffset * (1 - dip)), cellY(0)])
+      .range([
+        cellY(-levelOffset),
+        cellY(-levelOffset * (1 - dipTime)),
+        cellY(0)
+      ])
       .clamp(true);
 
     // compute
@@ -156,7 +169,7 @@ class Viz extends Component {
 
     // Draw zooming cone that connects previous level to this one
     ctx.fillStyle = "rgba(80,100,120, 0.15)";
-    if (level > 0 && t > dip) {
+    if (level > 0 && t > dipTime) {
       const ytop = scaleY(0) + cellH + 1;
       ctx.beginPath();
       ctx.moveTo(scaleX0(0), ytop);
@@ -264,6 +277,10 @@ class Viz extends Component {
     }
     ctx.restore();
   };
+  drawCalendarCell = (ctx, level, cell) => {
+    const s = this.state.calendarCellSize;
+    ctx.strokeRect(0, 0, s, s);
+  };
   drawCalendar = ctx => {
     const {
       path,
@@ -271,17 +288,24 @@ class Viz extends Component {
       numSquareCells,
       calendarCellSize,
       calendarX,
-      calendarY
+      calendarY,
+      levelOffset
     } = this.state;
-    let t = pathAnim % 1;
+    const { dipTime } = this.ds;
 
-    let index = path[Math.floor(pathAnim)];
-    if (index == null) {
-      index = path[path.length - 1];
+    let t = d3scale
+      .scaleLinear()
+      .domain([dipTime, 1])
+      .range([0, 1])
+      .clamp(true)(pathAnim % 1);
+
+    let level = path[Math.floor(pathAnim)];
+    if (level == null) {
+      level = path[path.length - 1];
       t = 1;
     }
-    const cellX = index % numSquareCells;
-    const cellY = Math.floor(index / numSquareCells);
+    const cellX = level % numSquareCells;
+    const cellY = Math.floor(level / numSquareCells);
 
     const s = calendarCellSize;
     const n = numSquareCells;
@@ -299,8 +323,7 @@ class Viz extends Component {
     ctx.rect(-1, -1, s * n + 2, s * n + 2);
     ctx.clip();
 
-    // outline window
-    ctx.strokeRect(0, 0, s * n, s * n);
+    ctx.save();
 
     // transform camera
     ctx.translate(x, y);
@@ -309,12 +332,49 @@ class Viz extends Component {
 
     // keep 1px line width
     ctx.lineWidth = 1 / scale;
+    ctx.strokeStyle = d3scale
+      .scaleLinear()
+      .domain([0, 1])
+      .range(["#fff", "#555"])(0.3);
 
     // draw parent
-    ctx.strokeRect(0, 0, s * n, s * n);
+    let cell = 0;
+    ctx.save();
+    for (let cy = 0; cy < numSquareCells; cy++) {
+      ctx.save();
+      for (let cx = 0; cx < numSquareCells; cx++) {
+        this.drawCalendarCell(ctx, level, cell);
+        ctx.translate(s, 0);
+      }
+      ctx.restore();
+      ctx.translate(0, s);
+    }
+    ctx.restore();
 
     // draw child
+    ctx.save();
+    ctx.translate(cellX * s, cellY * s);
+    const scale2 = 1 / numSquareCells;
+    ctx.lineWidth /= scale2;
+    ctx.globalAlpha *= t;
+    ctx.scale(scale2, scale2);
+    for (let cy = 0; cy < numSquareCells; cy++) {
+      ctx.save();
+      for (let cx = 0; cx < numSquareCells; cx++) {
+        this.drawCalendarCell(ctx, level, cell);
+        ctx.translate(s, 0);
+      }
+      ctx.restore();
+      ctx.translate(0, s);
+    }
+    ctx.restore();
+    ctx.strokeStyle = "#555";
     ctx.strokeRect(cellX * s, cellY * s, s, s);
+
+    // outline window
+    ctx.restore();
+    ctx.strokeStyle = "#555";
+    ctx.strokeRect(0, 0, s * n, s * n);
 
     ctx.restore();
   };
