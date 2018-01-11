@@ -317,7 +317,13 @@ class Viz extends Component {
   };
   drawCalendarCell = (ctx, level, cell) => {
     const s = this.state.calCellSize;
-    ctx.strokeRect(0, 0, s, s);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(s, 0);
+    ctx.moveTo(0, s);
+    ctx.lineTo(s, s);
+    ctx.stroke();
+    // ctx.strokeRect(0, 0, s, s);
   };
   drawCalendarNode = (ctx, level) => {
     const n = this.state.numSquareCells;
@@ -337,12 +343,12 @@ class Viz extends Component {
   };
   drawCalendarNodeTicks = (ctx, level) => {
     ctx.save();
+    ctx.lineWidth *= 2;
+    ctx.font = "10px sans-serif";
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
     const { calTimeK, calKX, calKRow, calRowY } = this.ds;
     if (level === 0) {
-      ctx.lineWidth *= 2;
-      ctx.font = "10px sans-serif";
-      ctx.textBaseline = "top";
-      ctx.textAlign = "left";
       const drawTick = (t, color, title) => {
         const k = calTimeK[level](t);
         const x = calKX(k);
@@ -360,6 +366,35 @@ class Viz extends Component {
       };
       drawTick(0, "#1eb7aa", "unix\nepoch");
       drawTick(+new Date() * 1e6, "#db7b35", "now");
+    }
+
+    ctx.lineWidth /= 2;
+    ctx.strokeStyle = ctx.fillStyle = "rgba(90,110,100, 0.5)";
+    const drawTick = (t, title) => {
+      const k = calTimeK[level](t);
+      const x = calKX(k);
+      const row = calKRow(k);
+      ctx.beginPath();
+      ctx.moveTo(x, calRowY(row));
+      ctx.lineTo(x, calRowY(row + 1));
+      ctx.stroke();
+      let y = calRowY(row);
+      for (let text of title.split("\n")) {
+        ctx.fillText(text, x + 5, y + 2);
+        y += 12;
+      }
+    };
+    const count = 32;
+    const ticks = calTimeK[level].ticks(count);
+    const tickFormat = calTimeK[level].tickFormat(count);
+    for (let i = 0; i < ticks.length; i++) {
+      const tickTime = ticks[i];
+      if (ticks[i] === ticks[i - 1]) continue; // nanosecond ticks sometimes duplicate
+      if (level === 0 && i === 7) continue; // we already drew this as "unix epoch"
+      const text = tickFormat(tickTime)
+        .split(" ")
+        .join("\n");
+      drawTick(tickTime, text);
     }
     ctx.restore();
   };
