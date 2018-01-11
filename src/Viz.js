@@ -6,6 +6,20 @@ import * as d3interpolate from "d3-interpolate";
 // import * as d3transition from "d3-transition";
 // import * as d3shape from "d3-shape";
 
+const nodeLengthLabels = [
+  "146 years",
+  "2.28 years",
+  "13.03 days",
+  "4.88 hours",
+  "4.58 min",
+  "4.29 s",
+  "67.11 ms",
+  "1.05 ms",
+  "16.38 µs",
+  "256 ns",
+  "4 ns"
+];
+
 class Viz extends Component {
   constructor(props) {
     super(props);
@@ -28,7 +42,7 @@ class Viz extends Component {
       levelOffset: 5,
 
       // Calendar placement and sizing
-      calCellSize: 40,
+      calCellSize: 38,
       calX: 700,
       calY: 40,
 
@@ -287,20 +301,7 @@ class Viz extends Component {
     if (t === 1) {
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      const labels = [
-        "146 years",
-        "2.28 years",
-        "13.03 days",
-        "4.88 hours",
-        "4.58 min",
-        "4.29 s",
-        "67.11 ms",
-        "1.05 ms",
-        "16.38 µs",
-        "256 ns",
-        "4 ns"
-      ];
-      ctx.fillText(labels[level], x1 + 28, treeRowY(0.5));
+      ctx.fillText(nodeLengthLabels[level], x1 + 28, treeRowY(0.5));
     }
 
     ctx.restore();
@@ -413,7 +414,7 @@ class Viz extends Component {
       calX,
       calY
     } = this.state;
-    const { dipTime, calW } = this.ds;
+    const { dipTime, calW, calTimeK } = this.ds;
 
     const s = calCellSize;
     const n = numSquareCells;
@@ -435,10 +436,12 @@ class Viz extends Component {
       .clamp(true)(t);
 
     let index = Math.floor(pathAnim);
+    let contextLabelIndex = index - 1;
 
     // edge case for last path
     if (index > path.length - 1) {
       index = path.length - 1;
+      contextLabelIndex = index;
       camT = 1;
       highlightT = 1;
     }
@@ -456,6 +459,27 @@ class Viz extends Component {
 
     ctx.save();
     ctx.translate(calX, calY);
+
+    // draw date context
+    ctx.save();
+    ctx.translate(calW, 0);
+    ctx.textBaseline = "bottom";
+    ctx.textAlign = "right";
+    const contextDate = calTimeK[level].contextFormat();
+    if (contextDate) {
+      ctx.fillStyle = "rgba(90,110,100, 0.3)";
+      ctx.fillText(contextDate, 0, -10);
+    }
+    ctx.restore();
+
+    // draw node time length
+    ctx.save();
+    ctx.translate(calW, calW);
+    ctx.textBaseline = "top";
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(90,110,100, 0.5)";
+    ctx.fillText(nodeLengthLabels[contextLabelIndex], -5, 10);
+    ctx.restore();
 
     // clip window
     ctx.beginPath();
