@@ -21,16 +21,16 @@ class Viz extends Component {
       pathAnim: 1,
 
       // Tree placement and sizing
-      cellW: 8,
-      cellH: 12,
+      treeCellW: 8,
+      treeCellH: 12,
       treeX: 40,
       treeY: 40,
       levelOffset: 5,
 
-      // Tree placement and sizing
-      calendarCellSize: 40,
-      calendarX: 700,
-      calendarY: 40,
+      // Calendar placement and sizing
+      calCellSize: 40,
+      calX: 700,
+      calY: 40,
 
       rootStart: -1152921504606846976,
       rootResolution: 56
@@ -52,12 +52,14 @@ class Viz extends Component {
   };
   computeDerivedState = (props, state) => {
     const {
-      cellW,
-      cellH,
+      treeCellW,
+      treeCellH,
+      calCellSize,
       path,
       rootStart,
       rootResolution,
       numCells,
+      numSquareCells,
       levelOffset
     } = state;
 
@@ -66,29 +68,47 @@ class Viz extends Component {
 
     const pixelRatio = window.devicePixelRatio || 1;
 
-    // maps cell number to its x position
-    const cellX = d3scale
+    // maps tree cell units to pixels
+    const treeColX = d3scale
       .scaleLinear()
       .domain([0, 1])
-      .range([0, cellW]);
+      .range([0, treeCellW]);
+    const treeRowY = d3scale
+      .scaleLinear()
+      .domain([0, 1])
+      .range([0, treeCellH]);
 
-    // maps cell number to its y position
-    const cellY = d3scale
+    // maps calendar cell units to pixels
+    const calColX = d3scale
       .scaleLinear()
       .domain([0, 1])
-      .range([0, cellH]);
+      .range([0, calCellSize]);
+    const calRowY = d3scale
+      .scaleLinear()
+      .domain([0, 1])
+      .range([0, calCellSize]);
+
+    const treeW = treeCellW * numCells;
+    const calW = calCellSize * numSquareCells;
 
     // compute scale for each level
     const pw = res => Math.pow(2, res);
     let start = rootStart;
     let res = rootResolution;
-    const timeX = [];
+    const treeTimeX = [];
+    const calTimeK = [];
     for (let i = 0; i < path.length; i++) {
       const end = start + pw(res) * numCells;
-      timeX.push(
+      const domain = [start, end];
+      treeTimeX.push(
         scaleTimeNano()
-          .domain([start, end])
-          .range([0, cellW * numCells])
+          .domain(domain)
+          .range([0, treeW])
+      );
+      calTimeK.push(
+        scaleTimeNano()
+          .domain(domain)
+          .range([0, calW * numSquareCells])
       );
       if (i + 1 < path.length) {
         start += pw(res) * path[i + 1];
@@ -96,28 +116,46 @@ class Viz extends Component {
       res -= 6;
     }
 
+    // calendar time to x and row
+    const calKX = k => k % calW;
+    const calKRow = k => Math.floor(k / calW);
+
     this.ds = {
       pixelRatio,
-      cellX,
-      cellY,
-      timeX,
+      treeW,
+      calW,
+      treeColX,
+      treeRowY,
+      treeTimeX,
+      calColX,
+      calRowY,
+      calTimeK,
+      calKX,
+      calKRow,
       dipTime
     };
   };
   drawTreeCell = (ctx, level, cell) => {
-    const { cellH, cellW, path } = this.state;
+    const { treeCellH, treeCellW, path } = this.state;
     const child = path[level + 1];
     ctx.globalAlpha = child === cell ? 1 : 0.1;
-    ctx.strokeRect(0, 0, cellW, cellH);
+    ctx.strokeRect(0, 0, treeCellW, treeCellH);
     if (child === cell) {
       ctx.fillStyle = "rgba(0,0,0,0.2)";
       ctx.fillStyle = "rgba(80,100,120, 0.15)";
-      ctx.fillRect(0, 0, cellW, cellH);
+      ctx.fillRect(0, 0, treeCellW, treeCellH);
     }
   };
   drawTreeNode = (ctx, level) => {
-    const { numCells, cellW, cellH, path, levelOffset, pathAnim } = this.state;
-    const { cellX, cellY, timeX, dipTime } = this.ds;
+    const {
+      numCells,
+      treeCellW,
+      treeCellH,
+      path,
+      levelOffset,
+      pathAnim
+    } = this.state;
+    const { treeColX, treeRowY, treeTimeX, dipTime } = this.ds;
 
     // index of the parent
     // (where in the previous level our node is coming from)
@@ -139,14 +177,14 @@ class Viz extends Component {
     const scaleX0 = d3scale
       .scaleLinear()
       .domain(domain)
-      .range([cellX(parent), cellX(parent), cellX(0)])
+      .range([treeColX(parent), treeColX(parent), treeColX(0)])
       .clamp(true);
 
     // right side
     const scaleX1 = d3scale
       .scaleLinear()
       .domain(domain)
-      .range([cellX(parent + 1), cellX(parent + 1), cellX(numCells)])
+      .range([treeColX(parent + 1), treeColX(parent + 1), treeColX(numCells)])
       .clamp(true);
 
     // top side
@@ -154,9 +192,9 @@ class Viz extends Component {
       .scaleLinear()
       .domain(domain)
       .range([
-        cellY(-levelOffset),
-        cellY(-levelOffset * (1 - dipTime)),
-        cellY(0)
+        treeRowY(-levelOffset),
+        treeRowY(-levelOffset * (1 - dipTime)),
+        treeRowY(0)
       ])
       .clamp(true);
 
@@ -171,7 +209,7 @@ class Viz extends Component {
     // Draw zooming cone that connects previous level to this one
     ctx.fillStyle = "rgba(80,100,120, 0.15)";
     if (level > 0 && t > dipTime) {
-      const ytop = scaleY(0) + cellH + 1;
+      const ytop = scaleY(0) + treeCellH + 1;
       ctx.beginPath();
       ctx.moveTo(scaleX0(0), ytop);
       ctx.lineTo(x0, y);
@@ -185,7 +223,7 @@ class Viz extends Component {
 
     // Make opaque
     ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, w, cellH);
+    ctx.fillRect(0, 0, w, treeCellH);
 
     // Draw inner cells
     ctx.strokeStyle = "#555";
@@ -193,13 +231,13 @@ class Viz extends Component {
       ctx.save();
       for (let cell = 0; cell < numCells; cell++) {
         this.drawTreeCell(ctx, level, cell);
-        ctx.translate(cellW, 0);
+        ctx.translate(treeCellW, 0);
       }
       ctx.restore();
     }
 
     // Draw outer border
-    ctx.strokeRect(0, 0, w, cellH);
+    ctx.strokeRect(0, 0, w, treeCellH);
 
     // Tick font
     ctx.font = "10px sans-serif";
@@ -209,15 +247,15 @@ class Viz extends Component {
     // Draw the major _unix epoch_ and _now_ ticks
     if (level === 0) {
       const drawTick = (t, color, title) => {
-        const x = timeX[level](t);
-        if (x < 0 || x > cellX(numCells)) return;
+        const x = treeTimeX[level](t);
+        if (x < 0 || x > treeColX(numCells)) return;
         ctx.strokeStyle = color;
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.moveTo(x, cellY(-0.7));
-        ctx.lineTo(x, cellY(1));
+        ctx.moveTo(x, treeRowY(-0.7));
+        ctx.lineTo(x, treeRowY(1));
         ctx.stroke();
-        ctx.fillText(title, x, cellY(-2));
+        ctx.fillText(title, x, treeRowY(-2));
       };
       drawTick(0, "#1eb7aa", "unix epoch");
       drawTick(+new Date() * 1e6, "#db7b35", "now");
@@ -227,16 +265,16 @@ class Viz extends Component {
     if (t === 1) {
       ctx.strokeStyle = ctx.fillStyle = "rgba(90,110,100, 0.5)";
       const drawTick = (t, title) => {
-        const x = timeX[level](t);
+        const x = treeTimeX[level](t);
         ctx.beginPath();
-        ctx.moveTo(x, cellY(0));
-        ctx.lineTo(x, cellY(-0.5));
+        ctx.moveTo(x, treeRowY(0));
+        ctx.lineTo(x, treeRowY(-0.5));
         ctx.stroke();
-        ctx.fillText(title, x, cellY(-0.75));
+        ctx.fillText(title, x, treeRowY(-0.75));
       };
       const count = 8;
-      const ticks = timeX[level].ticks(count);
-      const tickFormat = timeX[level].tickFormat(count);
+      const ticks = treeTimeX[level].ticks(count);
+      const tickFormat = treeTimeX[level].tickFormat(count);
       for (let i = 0; i < ticks.length; i++) {
         const tickTime = ticks[i];
         // nanosecond ticks sometimes duplicate
@@ -263,28 +301,28 @@ class Viz extends Component {
         "256 ns",
         "4 ns"
       ];
-      ctx.fillText(labels[level], x1 + 28, cellY(0.5));
+      ctx.fillText(labels[level], x1 + 28, treeRowY(0.5));
     }
 
     ctx.restore();
   };
   drawTree = ctx => {
     ctx.save();
-    const { treeX, treeY, cellH, levelOffset, path } = this.state;
+    const { treeX, treeY, treeCellH, levelOffset, path } = this.state;
     ctx.translate(treeX, treeY);
     for (let level = 0; level < path.length; level++) {
       this.drawTreeNode(ctx, level);
-      ctx.translate(0, cellH * levelOffset);
+      ctx.translate(0, treeCellH * levelOffset);
     }
     ctx.restore();
   };
   drawCalendarCell = (ctx, level, cell) => {
-    const s = this.state.calendarCellSize;
+    const s = this.state.calCellSize;
     ctx.strokeRect(0, 0, s, s);
   };
   drawCalendarNode = (ctx, level) => {
     const n = this.state.numSquareCells;
-    const s = this.state.calendarCellSize;
+    const s = this.state.calCellSize;
     let cell = 0;
     ctx.save();
     for (let cy = 0; cy < n; cy++) {
@@ -298,18 +336,40 @@ class Viz extends Component {
     }
     ctx.restore();
   };
+  drawCalendarNodeTicks = (ctx, level) => {
+    ctx.save();
+    const { calTimeK, calKX, calKRow, calRowY } = this.ds;
+    if (level === 0) {
+      ctx.lineWidth *= 2;
+      const drawTick = (t, color, title) => {
+        const k = calTimeK[level](t);
+        const x = calKX(k);
+        const row = calKRow(k);
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x, calRowY(row));
+        ctx.lineTo(x, calRowY(row + 1));
+        ctx.stroke();
+        // ctx.fillText(title, x, treeRowY(-2));
+      };
+      drawTick(0, "#1eb7aa", "unix epoch");
+      drawTick(+new Date() * 1e6, "#db7b35", "now");
+    }
+    ctx.restore();
+  };
   drawCalendar = ctx => {
     const {
       path,
       pathAnim,
       numSquareCells,
-      calendarCellSize,
-      calendarX,
-      calendarY
+      calCellSize,
+      calX,
+      calY
     } = this.state;
-    const { dipTime } = this.ds;
+    const { dipTime, calW } = this.ds;
 
-    const s = calendarCellSize;
+    const s = calCellSize;
     const n = numSquareCells;
 
     const t = pathAnim % 1;
@@ -328,66 +388,79 @@ class Viz extends Component {
       .range([0, 1])
       .clamp(true)(t);
 
-    let level = path[Math.floor(pathAnim)];
+    let index = Math.floor(pathAnim);
 
     // edge case for last path
-    if (level == null) {
-      level = path[path.length - 1];
+    if (index > path.length - 1) {
+      index = path.length - 1;
       camT = 1;
       highlightT = 1;
     }
 
-    const cellX = level % n;
-    const cellY = Math.floor(level / n);
+    const child = path[index];
+    const level = index - 1;
+
+    const treeColX = child % n;
+    const treeRowY = Math.floor(child / n);
 
     const [x, y, scale] = d3scale
       .scaleLinear()
       .domain([0, 1])
-      .range([[cellX * s, cellY * s, 1], [0, 0, n]])(camT);
+      .range([[treeColX * s, treeRowY * s, 1 / n], [0, 0, 1]])(camT);
 
-    ctx.save(); // 1
-    ctx.translate(calendarX, calendarY);
+    ctx.save();
+    ctx.translate(calX, calY);
 
     // clip window
     ctx.beginPath();
     ctx.rect(-1, -1, s * n + 2, s * n + 2);
     ctx.clip();
 
-    ctx.save(); // 2
-
-    // transform camera
-    ctx.translate(x, y);
-    ctx.scale(scale, scale);
-    ctx.translate(-cellX * s, -cellY * s);
-
-    // keep 1px line width
-    ctx.lineWidth = 1 / scale;
-    const gridColor = d3interpolate.interpolate("#fff", "#555")(0.3);
-    ctx.strokeStyle = gridColor;
+    const transformToChild = () => {
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.lineWidth /= scale;
+    };
+    const transformToParent = () => {
+      transformToChild();
+      ctx.scale(n, n);
+      ctx.translate(-treeColX * s, -treeRowY * s);
+      ctx.lineWidth /= n;
+    };
 
     // draw parent
+    const gridColor = d3interpolate.interpolate("#fff", "#555")(0.3);
+    ctx.strokeStyle = gridColor;
+    ctx.save();
+    transformToParent();
     this.drawCalendarNode(ctx, level);
+    ctx.restore();
 
     // draw child
-    ctx.save(); // 3
-    ctx.translate(cellX * s, cellY * s);
-    const scale2 = 1 / n;
-    ctx.lineWidth /= scale2;
-    ctx.scale(scale2, scale2);
+    ctx.save();
+    transformToChild();
     ctx.globalAlpha *= d3interpolate.interpolate(0, 1)(Math.pow(camT, 2));
-    this.drawCalendarNode(ctx, level);
-    ctx.restore(); // 3
+    this.drawCalendarNode(ctx, level + 1);
+    ctx.restore();
 
-    // highlight child
+    // outline child
+    ctx.save();
+    transformToChild();
     ctx.strokeStyle = d3interpolate.interpolate(gridColor, "#555")(highlightT);
-    ctx.strokeRect(cellX * s, cellY * s, s, s);
+    ctx.strokeRect(0, 0, calW, calW);
+    ctx.restore();
 
     // outline window
-    ctx.restore(); // 2
     ctx.strokeStyle = "#555";
     ctx.strokeRect(0, 0, s * n, s * n);
 
-    ctx.restore(); // 1
+    // draw ticks
+    ctx.save();
+    transformToParent();
+    this.drawCalendarNodeTicks(ctx, level);
+    ctx.restore();
+
+    ctx.restore();
   };
   draw = canvas => {
     if (!canvas) return;
