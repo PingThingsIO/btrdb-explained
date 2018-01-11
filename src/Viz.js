@@ -317,13 +317,18 @@ class Viz extends Component {
   };
   drawCalendarCell = (ctx, level, cell) => {
     const s = this.state.calCellSize;
+    const len = 5;
+    ctx.save();
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(s, 0);
-    ctx.moveTo(0, s);
-    ctx.lineTo(s, s);
     ctx.stroke();
-    // ctx.strokeRect(0, 0, s, s);
+    ctx.globalAlpha *= 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, len);
+    ctx.stroke();
+    ctx.restore();
   };
   drawCalendarNode = (ctx, level) => {
     const n = this.state.numSquareCells;
@@ -453,7 +458,7 @@ class Viz extends Component {
 
     // clip window
     ctx.beginPath();
-    ctx.rect(-1, -1, s * n + 2, s * n + 2);
+    ctx.rect(-1, -1, calW + 2, calW + 2);
     ctx.clip();
 
     const transformToChild = () => {
@@ -476,11 +481,25 @@ class Viz extends Component {
     this.drawCalendarNode(ctx, level);
     ctx.restore();
 
+    // draw parent ticks
+    ctx.save();
+    transformToParent();
+    this.drawCalendarNodeTicks(ctx, level);
+    ctx.strokeRect(0, 0, calW, calW);
+    ctx.restore();
+
     // draw child
+    const childAlpha = d3interpolate.interpolate(0, 1)(Math.pow(camT, 2));
     ctx.save();
     transformToChild();
-    ctx.globalAlpha *= d3interpolate.interpolate(0, 1)(Math.pow(camT, 2));
+    ctx.beginPath();
+    ctx.rect(-1, -1, calW + 2, calW + 2);
+    ctx.clip();
+    ctx.globalAlpha *= childAlpha;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, calW, calW);
     this.drawCalendarNode(ctx, level + 1);
+    this.drawCalendarNodeTicks(ctx, level + 1);
     ctx.restore();
 
     // outline child
@@ -492,13 +511,7 @@ class Viz extends Component {
 
     // outline window
     ctx.strokeStyle = "#555";
-    ctx.strokeRect(0, 0, s * n, s * n);
-
-    // draw ticks
-    ctx.save();
-    transformToParent();
-    this.drawCalendarNodeTicks(ctx, level);
-    ctx.restore();
+    ctx.strokeRect(0, 0, calW, calW);
 
     ctx.restore();
   };
