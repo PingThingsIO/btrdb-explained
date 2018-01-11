@@ -249,8 +249,7 @@ class Viz extends Component {
       const drawTick = (t, color, title) => {
         const x = treeTimeX[level](t);
         if (x < 0 || x > treeColX(numCells)) return;
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
+        ctx.fillStyle = ctx.strokeStyle = color;
         ctx.beginPath();
         ctx.moveTo(x, treeRowY(-0.7));
         ctx.lineTo(x, treeRowY(1));
@@ -341,19 +340,25 @@ class Viz extends Component {
     const { calTimeK, calKX, calKRow, calRowY } = this.ds;
     if (level === 0) {
       ctx.lineWidth *= 2;
+      ctx.font = "10px sans-serif";
+      ctx.textBaseline = "top";
+      ctx.textAlign = "left";
       const drawTick = (t, color, title) => {
         const k = calTimeK[level](t);
         const x = calKX(k);
         const row = calKRow(k);
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
+        ctx.fillStyle = ctx.strokeStyle = color;
         ctx.beginPath();
         ctx.moveTo(x, calRowY(row));
         ctx.lineTo(x, calRowY(row + 1));
         ctx.stroke();
-        // ctx.fillText(title, x, treeRowY(-2));
+        let y = calRowY(row);
+        for (let text of title.split("\n")) {
+          ctx.fillText(text, x + 5, y + 2);
+          y += 12;
+        }
       };
-      drawTick(0, "#1eb7aa", "unix epoch");
+      drawTick(0, "#1eb7aa", "unix\nepoch");
       drawTick(+new Date() * 1e6, "#db7b35", "now");
     }
     ctx.restore();
