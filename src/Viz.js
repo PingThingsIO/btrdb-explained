@@ -317,7 +317,7 @@ class Viz extends Component {
   };
   drawCalendarCell = (ctx, level, cell) => {
     const s = this.state.calCellSize;
-    const len = 5;
+    const len = 4;
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -352,6 +352,7 @@ class Viz extends Component {
     ctx.font = "10px sans-serif";
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
+    const pad = { left: 5, top: 4 };
     const { calTimeK, calKX, calKRow, calRowY } = this.ds;
     if (level === 0) {
       const drawTick = (t, color, title) => {
@@ -365,7 +366,7 @@ class Viz extends Component {
         ctx.stroke();
         let y = calRowY(row);
         for (let text of title.split("\n")) {
-          ctx.fillText(text, x + 5, y + 2);
+          ctx.fillText(text, x + pad.left, y + pad.top);
           y += 12;
         }
       };
@@ -385,7 +386,7 @@ class Viz extends Component {
       ctx.stroke();
       let y = calRowY(row);
       for (let text of title.split("\n")) {
-        ctx.fillText(text, x + 5, y + 2);
+        ctx.fillText(text, x + pad.left, y + pad.top);
         y += 12;
       }
     };
@@ -505,7 +506,9 @@ class Viz extends Component {
     // outline child
     ctx.save();
     transformToChild();
-    ctx.strokeStyle = d3interpolate.interpolate(gridColor, "#555")(highlightT);
+    ctx.strokeStyle = d3interpolate.interpolate("rgba(0,0,0,0)", "#555")(
+      highlightT
+    );
     ctx.strokeRect(0, 0, calW, calW);
     ctx.restore();
 
