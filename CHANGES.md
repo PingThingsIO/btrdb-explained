@@ -1,3 +1,12 @@
+## v2018.01.11
+
+[screenshot][screenshot-2018-01-11] | [demo permalink][demo-2018-01-11]
+
+- Add calendar metaphor for a zoomable 2D representation
+
+[screenshot-2018-01-11]:https://user-images.githubusercontent.com/116838/34836478-9ed6755e-f6bd-11e7-8895-353dfdfbc2cc.gif
+[demo-2018-01-11]:http://btrdb-viz-2018-01-11.surge.sh
+
 ## v2018.01.08
 
 [screenshot][screenshot-2018-01-08] | [demo permalink][demo-2018-01-08]
