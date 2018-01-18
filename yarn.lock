@@ -1865,6 +1865,10 @@ del@^3.0.0:
     pify "^3.0.0"
     rimraf "^2.2.8"
 
+delaunay-fast@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/delaunay-fast/-/delaunay-fast-1.0.1.tgz#b50507cb0f1ff850ada0002b9e3ac289a7b52649"
+
 delayed-stream@~1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/delayed-stream/-/delayed-stream-1.0.0.tgz#df3ae199acadfb7d440aaae0b29e2272b24ec619"

@@ -1,10 +1,10 @@
 import React, { Component } from "react";
-import Demo from "./Demo.js";
+import Booth from "./Booth.js";
 import "./App.css";
 
 class App extends Component {
   render() {
-    return <Demo />;
+    return <Booth />;
   }
 }
 
