@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { pointLookup, randomMesh } from "./geometry";
+import { pointLookup, randomMesh, distGraph } from "./geometry";
 
 class Ping extends Component {
   constructor(props) {
@@ -13,6 +13,8 @@ class Ping extends Component {
     this.state.points = points;
     this.state.triangles = triangles;
     this.state.graph = graph;
+    this.state.distGraph = distGraph(graph, 0);
+    console.log(this.state.distGraph);
   }
   componentWillMount() {
     this.computeDerivedState(this.props, this.state);

@@ -1,4 +1,5 @@
 import delaunay from "delaunay-fast";
+import * as d3array from "d3-array";
 
 // return triplets of indices
 function triangulate(points) {
@@ -42,7 +43,8 @@ function createGraph(points, triangles) {
   const graph = points.map(p => ({}));
   for (let [a, b, c] of triangles) {
     for (let [i, j] of [[a, b], [b, c], [c, a]]) {
-      graph[i][j] = graph[j][i] = true;
+      const [p0, p1] = pointLookup(points, [i, j]);
+      graph[i][j] = graph[j][i] = dist(p0, p1);
     }
   }
   return graph;
@@ -109,4 +111,62 @@ function randomMesh({ n, xdomain, ydomain, minDist, minArea, minAngle }) {
   return { points, triangles, graph };
 }
 
-export { pointLookup, randomMesh };
+function distGraph(graph, root) {
+  // state: distance left to be traveled between a->b
+  const progress = {};
+  const initProgress = ([a, b]) => {
+    if (progress[a] == null) progress[a] = {};
+    if (progress[a][b] == null) progress[a][b] = graph[a][b];
+  };
+
+  // state: distance traveled before going from a->b
+  const dist = {};
+
+  // state: total distance traveled
+  let totalDist = 0;
+
+  // state: nodes we should not revisit
+  const isBlocked = { [root]: true };
+
+  // state: a->b paths that we are currently traveling (array of [a,b])
+  const frontier = [];
+
+  // when we reach a node...
+  const visit = a => {
+    dist[a] = totalDist;
+    for (let b of Object.keys(graph[a])) {
+      b = parseInt(b, 10);
+      if (!isBlocked[b]) {
+        initProgress([a, b]);
+        frontier.push([a, b]);
+        isBlocked[b] = true;
+      }
+    }
+  };
+
+  // walk the graph
+  visit(root);
+  while (frontier.length > 0) {
+    const step = d3array.min(frontier.map(([a, b]) => progress[a][b]));
+    totalDist += step;
+
+    // update/expire frontier nodes
+    const arrived = [];
+    for (let i = frontier.length - 1; i >= 0; i--) {
+      const [a, b] = frontier[i];
+      if (progress[a][b] === step) {
+        frontier.splice(i, 1);
+        arrived.push(b);
+      }
+      progress[a][b] -= step;
+    }
+
+    for (let a of arrived) {
+      visit(a);
+    }
+  }
+
+  return dist;
+}
+
+export { pointLookup, randomMesh, distGraph };
