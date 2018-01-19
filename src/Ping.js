@@ -1,4 +1,6 @@
 import React, { Component } from "react";
+import * as d3scale from "d3-scale";
+import * as d3interpolate from "d3-interpolate";
 import { pointLookup, randomMesh, rippleMap } from "./geometry";
 
 class Ping extends Component {
@@ -7,14 +9,18 @@ class Ping extends Component {
     this.state = {
       // canvas
       width: 1024,
-      height: 600
+      height: 600,
+      animDist: 0,
+      animTail: 80
     };
     const { points, triangles, graph } = this.randomMesh();
+    const root = Math.floor(Math.random() * points.length);
+    const { distMap, totalDist } = rippleMap(graph, root);
     this.state.points = points;
     this.state.triangles = triangles;
     this.state.graph = graph;
-    const { distMap } = rippleMap(graph, 0);
     this.state.distMap = distMap;
+    this.state.totalDist = totalDist;
   }
   componentWillMount() {
     this.computeDerivedState(this.props, this.state);
@@ -70,18 +76,31 @@ class Ping extends Component {
     ctx.stroke();
   };
   drawRippleMap = ctx => {
-    const { points, distMap } = this.state;
-    ctx.beginPath();
+    const { points, distMap, animDist, animTail } = this.state;
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 3;
     for (let i of Object.keys(distMap)) {
+      const start = distMap[i].distFromRoot;
       for (let j of Object.keys(distMap[i].distTo)) {
-        const [a, b] = pointLookup(points, [i, j]);
-        ctx.moveTo(a[0], a[1]);
-        ctx.lineTo(b[0], b[1]);
+        const dist = distMap[i].distTo[j];
+        const scale = d3scale
+          .scaleLinear()
+          .domain([start, start + dist])
+          .range([0, 1])
+          .clamp(true);
+        const t0 = scale(animDist);
+        const t1 = scale(animDist - animTail);
+        if (t0 > 0 && t1 < 1) {
+          const [a, b] = pointLookup(points, [i, j]);
+          const c = d3interpolate.interpolate(a, b)(t0);
+          const d = d3interpolate.interpolate(a, b)(t1);
+          ctx.beginPath();
+          ctx.moveTo(d[0], d[1]);
+          ctx.lineTo(c[0], c[1]);
+          ctx.stroke();
+        }
       }
     }
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "red";
-    ctx.stroke();
   };
   draw = canvas => {
     if (!canvas) return;
@@ -96,6 +115,20 @@ class Ping extends Component {
     this.drawRippleMap(ctx);
     ctx.restore();
   };
+  onMouseMove = e => {
+    const rect = this.canvas.getBoundingClientRect();
+    // const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const { height, totalDist, animTail } = this.state;
+    const pad = 40;
+    const scale = d3scale
+      .scaleLinear()
+      .domain([pad, height - pad])
+      .range([0, totalDist + animTail])
+      .clamp(true);
+    const animDist = scale(y);
+    this.setState({ animDist });
+  };
   render() {
     const { width, height } = this.state;
     const { pixelRatio } = this.ds;
@@ -108,6 +141,7 @@ class Ping extends Component {
         width={width * pixelRatio}
         height={height * pixelRatio}
         style={{ width: `${width}px`, height: `${height}px` }}
+        onMouseMove={this.onMouseMove}
       />
     );
   }
