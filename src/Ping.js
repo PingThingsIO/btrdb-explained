@@ -11,7 +11,7 @@ class Ping extends Component {
       width: 1024,
       height: 600,
       animDist: 0,
-      animTail: 80
+      animTail: 100
     };
     const { points, triangles, graph } = this.randomMesh();
     const root = Math.floor(Math.random() * points.length);
@@ -37,12 +37,13 @@ class Ping extends Component {
   randomMesh = () => {
     const { width, height } = this.state;
     const pad = 20;
+    const n = 24;
     return randomMesh({
-      n: 18,
+      n,
       xdomain: [pad, width - pad],
       ydomain: [pad, height - pad],
       minDist: 60,
-      minArea: Math.pow(120, 2) / 2,
+      minArea: width * height / n / 6,
       minAngle: 20 * Math.PI / 180
     });
   };
