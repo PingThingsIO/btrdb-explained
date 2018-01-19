@@ -1,7 +1,7 @@
 import React, { Component } from "react";
 import * as d3scale from "d3-scale";
 import * as d3interpolate from "d3-interpolate";
-import { pointLookup, randomMesh, rippleMap } from "./geometry";
+import { pointLookup, randomMesh, rippleMap, dist } from "./geometry";
 
 class Ping extends Component {
   constructor(props) {
@@ -37,7 +37,7 @@ class Ping extends Component {
   randomMesh = () => {
     const { width, height } = this.state;
     const pad = 20;
-    const n = 24;
+    const n = 20;
     return randomMesh({
       n,
       xdomain: [pad, width - pad],
@@ -78,26 +78,37 @@ class Ping extends Component {
   };
   drawRippleMap = ctx => {
     const { points, distMap, animDist, animTail } = this.state;
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 3;
     for (let i of Object.keys(distMap)) {
       const start = distMap[i].distFromRoot;
       for (let j of Object.keys(distMap[i].distTo)) {
-        const dist = distMap[i].distTo[j];
+        const distTo = distMap[i].distTo[j];
         const scale = d3scale
           .scaleLinear()
-          .domain([start, start + dist])
+          .domain([start, start + distTo])
           .range([0, 1])
           .clamp(true);
         const t0 = scale(animDist);
         const t1 = scale(animDist - animTail);
         if (t0 > 0 && t1 < 1) {
-          const [a, b] = pointLookup(points, [i, j]);
-          const c = d3interpolate.interpolate(a, b)(t0);
-          const d = d3interpolate.interpolate(a, b)(t1);
+          const [src, dst] = pointLookup(points, [i, j]);
+          const point = t => d3interpolate.interpolate(src, dst)(t);
+
+          const start = point(t0);
+          const end = point(t1);
+
+          const r = dist(point((t0 + t1) / 2), end);
           ctx.beginPath();
-          ctx.moveTo(d[0], d[1]);
-          ctx.lineTo(c[0], c[1]);
+          ctx.ellipse(src[0], src[1], r, r, 0, 0, 2 * Math.PI);
+          ctx.lineWidth = dist(start, end);
+          ctx.strokeStyle = "rgba(0,0,0,0.1)";
+          ctx.stroke();
+
+          // draw dist
+          ctx.beginPath();
+          ctx.strokeStyle = "#000";
+          ctx.lineWidth = 3;
+          ctx.moveTo(start[0], start[1]);
+          ctx.lineTo(end[0], end[1]);
           ctx.stroke();
         }
       }

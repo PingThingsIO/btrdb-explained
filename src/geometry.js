@@ -171,4 +171,4 @@ function rippleMap(graph, root) {
   return { distMap, totalDist };
 }
 
-export { pointLookup, randomMesh, rippleMap };
+export { pointLookup, randomMesh, rippleMap, dist };
