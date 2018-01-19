@@ -38,6 +38,16 @@ function triangleAngles([p0, p1, p2]) {
   return [angle(a, b, c), angle(b, c, a), angle(c, a, b)];
 }
 
+function createGraph(points, triangles) {
+  const graph = points.map(p => ({}));
+  for (let [a, b, c] of triangles) {
+    for (let [i, j] of [[a, b], [b, c], [c, a]]) {
+      graph[i][j] = graph[j][i] = true;
+    }
+  }
+  return graph;
+}
+
 function randomMesh({ n, xdomain, ydomain, minDist, minArea, minAngle }) {
   const points = [];
   const [xmin, xmax] = xdomain;
@@ -94,8 +104,9 @@ function randomMesh({ n, xdomain, ydomain, minDist, minArea, minAngle }) {
     }
   }
   const triangles = triangulate(points);
+  const graph = createGraph(points, triangles);
 
-  return { points, triangles };
+  return { points, triangles, graph };
 }
 
 export { pointLookup, randomMesh };

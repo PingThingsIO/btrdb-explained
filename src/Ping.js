@@ -9,9 +9,10 @@ class Ping extends Component {
       width: 1024,
       height: 600
     };
-    const { points, triangles } = this.randomMesh();
+    const { points, triangles, graph } = this.randomMesh();
     this.state.points = points;
     this.state.triangles = triangles;
+    this.state.graph = graph;
   }
   componentWillMount() {
     this.computeDerivedState(this.props, this.state);
@@ -27,10 +28,11 @@ class Ping extends Component {
   };
   randomMesh = () => {
     const { width, height } = this.state;
+    const pad = 20;
     return randomMesh({
       n: 18,
-      xdomain: [0, width],
-      ydomain: [0, height],
+      xdomain: [pad, width - pad],
+      ydomain: [pad, height - pad],
       minDist: 60,
       minArea: Math.pow(120, 2) / 2,
       minAngle: 20 * Math.PI / 180
@@ -39,7 +41,7 @@ class Ping extends Component {
   drawTriangles = ctx => {
     const { points, triangles } = this.state;
 
-    ctx.strokeStyle = "#789";
+    ctx.fillStyle = "#f5f4f7";
     for (let indexes of triangles) {
       const [a, b, c] = pointLookup(points, indexes);
       ctx.beginPath();
@@ -47,8 +49,23 @@ class Ping extends Component {
       ctx.lineTo(b[0], b[1]);
       ctx.lineTo(c[0], c[1]);
       ctx.closePath();
-      ctx.stroke();
+      ctx.fill();
     }
+  };
+  drawGraph = ctx => {
+    const { points, graph } = this.state;
+    ctx.beginPath();
+    for (let i = 0; i < graph.length; i++) {
+      for (let j of Object.keys(graph[i])) {
+        if (i < j) {
+          const [a, b] = pointLookup(points, [i, j]);
+          ctx.moveTo(a[0], a[1]);
+          ctx.lineTo(b[0], b[1]);
+        }
+      }
+    }
+    ctx.strokeStyle = "#789";
+    ctx.stroke();
   };
   draw = canvas => {
     if (!canvas) return;
@@ -59,6 +76,7 @@ class Ping extends Component {
     ctx.scale(pixelRatio, pixelRatio);
     ctx.clearRect(0, 0, width, height);
     this.drawTriangles(ctx);
+    this.drawGraph(ctx);
     ctx.restore();
   };
   render() {
