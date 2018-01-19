@@ -111,7 +111,7 @@ function randomMesh({ n, xdomain, ydomain, minDist, minArea, minAngle }) {
   return { points, triangles, graph };
 }
 
-function distGraph(graph, root) {
+function rippleMap(graph, root) {
   // state: distance left to be traveled between a->b
   const progress = {};
   const initProgress = ([a, b]) => {
@@ -119,11 +119,11 @@ function distGraph(graph, root) {
     if (progress[a][b] == null) progress[a][b] = graph[a][b];
   };
 
-  // state: distance traveled before going from a->b
-  const dist = {};
+  // state: result
+  const distMap = {};
 
   // state: total distance traveled
-  let totalDist = 0;
+  let distFromRoot = 0;
 
   // state: nodes we should not revisit
   const isBlocked = { [root]: true };
@@ -133,10 +133,11 @@ function distGraph(graph, root) {
 
   // when we reach a node...
   const visit = a => {
-    dist[a] = totalDist;
+    distMap[a] = { distFromRoot, distTo: {} };
     for (let b of Object.keys(graph[a])) {
       b = parseInt(b, 10);
       if (!isBlocked[b]) {
+        distMap[a].distTo[b] = graph[a][b];
         initProgress([a, b]);
         frontier.push([a, b]);
         isBlocked[b] = true;
@@ -148,7 +149,7 @@ function distGraph(graph, root) {
   visit(root);
   while (frontier.length > 0) {
     const step = d3array.min(frontier.map(([a, b]) => progress[a][b]));
-    totalDist += step;
+    distFromRoot += step;
 
     // update/expire frontier nodes
     const arrived = [];
@@ -166,7 +167,8 @@ function distGraph(graph, root) {
     }
   }
 
-  return dist;
+  const totalDist = distFromRoot;
+  return { distMap, totalDist };
 }
 
-export { pointLookup, randomMesh, distGraph };
+export { pointLookup, randomMesh, rippleMap };

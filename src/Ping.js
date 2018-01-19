@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { pointLookup, randomMesh, distGraph } from "./geometry";
+import { pointLookup, randomMesh, rippleMap } from "./geometry";
 
 class Ping extends Component {
   constructor(props) {
@@ -13,8 +13,8 @@ class Ping extends Component {
     this.state.points = points;
     this.state.triangles = triangles;
     this.state.graph = graph;
-    this.state.distGraph = distGraph(graph, 0);
-    console.log(this.state.distGraph);
+    const { distMap } = rippleMap(graph, 0);
+    this.state.distMap = distMap;
   }
   componentWillMount() {
     this.computeDerivedState(this.props, this.state);
@@ -69,6 +69,20 @@ class Ping extends Component {
     ctx.strokeStyle = "#789";
     ctx.stroke();
   };
+  drawRippleMap = ctx => {
+    const { points, distMap } = this.state;
+    ctx.beginPath();
+    for (let i of Object.keys(distMap)) {
+      for (let j of Object.keys(distMap[i].distTo)) {
+        const [a, b] = pointLookup(points, [i, j]);
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+      }
+    }
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "red";
+    ctx.stroke();
+  };
   draw = canvas => {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -79,6 +93,7 @@ class Ping extends Component {
     ctx.clearRect(0, 0, width, height);
     this.drawTriangles(ctx);
     this.drawGraph(ctx);
+    this.drawRippleMap(ctx);
     ctx.restore();
   };
   render() {
