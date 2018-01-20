@@ -2,8 +2,10 @@ import React, { Component } from "react";
 import * as d3array from "d3-array";
 import * as d3scale from "d3-scale";
 import * as d3interpolate from "d3-interpolate";
+
 import { pointLookup, randomMesh, rippleMap, dist } from "./geometry";
 import logo from "./logo.svg";
+import { backgroundGray, supportGray, popGreen, popOrange } from "./colors";
 
 class Ping extends Component {
   constructor(props) {
@@ -22,7 +24,22 @@ class Ping extends Component {
     this.state.triangles = triangles;
     this.state.graph = graph;
     this.state.distMap = distMap;
-    this.state.totalDist = totalDist;
+    this.state.totalDist = totalDist + 1;
+    this.state.frontierColors = points.map(_ => {
+      const t = Math.random();
+      if (t < 0.1) {
+        return d3interpolate.interpolate(popGreen, "rgba(255,255,255,0)")(0.6);
+      }
+      if (t < 0.2) {
+        return d3interpolate.interpolate(popOrange, "rgba(255,255,255,0)")(0.6);
+      }
+      return d3interpolate.interpolate(backgroundGray, "rgba(255,255,255,0)")(
+        0.4
+      );
+    });
+
+    this.logo = new Image();
+    this.logo.src = logo;
   }
   componentWillMount() {
     this.computeDerivedState(this.props, this.state);
@@ -75,15 +92,54 @@ class Ping extends Component {
         }
       }
     }
-    ctx.strokeStyle = "#789";
+    ctx.strokeStyle = supportGray;
     ctx.stroke();
   };
-  drawRippleMap = ctx => {
+  drawRippleBranches = ctx => {
     const { points, distMap, animDist, animTail } = this.state;
-    const frontierColor = d3interpolate.interpolate("#789", "rgba(0,0,0,0)")(
-      0.8
-    );
-    const lineColor = "#789";
+    const lineColor = supportGray;
+    for (let i of Object.keys(distMap)) {
+      const node = distMap[i];
+      const start = node.distFromRoot;
+      for (let j of Object.keys(node.distTo)) {
+        const childDist = node.distTo[j];
+        const scale = d3scale
+          .scaleLinear()
+          .domain([start, start + childDist])
+          .range([0, 1])
+          .clamp(true);
+        const headT = scale(animDist);
+        const tailT = scale(animDist - animTail);
+        if (headT > 0 && tailT < 1) {
+          const [src, dst] = pointLookup(points, [i, j]);
+          const point = t => d3interpolate.interpolate(src, dst)(t);
+
+          const head = point(headT);
+          const tail = point(tailT);
+
+          ctx.beginPath();
+          ctx.strokeStyle = lineColor;
+          ctx.lineWidth = 3;
+          ctx.moveTo(head[0], head[1]);
+          ctx.lineTo(tail[0], tail[1]);
+          ctx.stroke();
+
+          const dot = p => {
+            const r = 4;
+            ctx.beginPath();
+            ctx.ellipse(p[0], p[1], r, r, 0, 0, 2 * Math.PI);
+            ctx.fillStyle = lineColor;
+            ctx.fill();
+          };
+
+          if (tailT === 0) dot(tail);
+          if (headT === 1) dot(head);
+        }
+      }
+    }
+  };
+  drawRipples = ctx => {
+    const { points, distMap, animDist, animTail, frontierColors } = this.state;
     for (let i of Object.keys(distMap)) {
       const node = distMap[i];
       const start = node.distFromRoot;
@@ -109,31 +165,20 @@ class Ping extends Component {
             ctx.beginPath();
             ctx.ellipse(src[0], src[1], r, r, 0, 0, 2 * Math.PI);
             ctx.lineWidth = dist(head, tail);
-            ctx.strokeStyle = frontierColor;
+            ctx.strokeStyle = frontierColors[i];
             ctx.stroke();
           }
-
-          // draw dist
-          ctx.beginPath();
-          ctx.strokeStyle = lineColor;
-          ctx.lineWidth = 3;
-          ctx.moveTo(head[0], head[1]);
-          ctx.lineTo(tail[0], tail[1]);
-          ctx.stroke();
-
-          const dot = p => {
-            const r = 4;
-            ctx.beginPath();
-            ctx.ellipse(p[0], p[1], r, r, 0, 0, 2 * Math.PI);
-            ctx.fillStyle = lineColor;
-            ctx.fill();
-          };
-
-          if (tailT === 0) dot(tail);
-          if (headT === 1) dot(head);
         }
       }
     }
+  };
+  drawLogo = ctx => {
+    const s = 1;
+    const w = this.logo.width * s;
+    const h = this.logo.height * s;
+    const x = this.state.width / 2 - w / 2;
+    const y = this.state.height / 2 - h / 2;
+    ctx.drawImage(this.logo, x, y, w, h);
   };
   draw = canvas => {
     if (!canvas) return;
@@ -143,11 +188,11 @@ class Ping extends Component {
     ctx.save();
     ctx.scale(pixelRatio, pixelRatio);
     ctx.clearRect(0, 0, width, height);
-    ctx.globalAlpha = 0;
-    this.drawTriangles(ctx);
-    this.drawGraph(ctx);
-    ctx.globalAlpha = 1;
-    this.drawRippleMap(ctx);
+    // this.drawTriangles(ctx);
+    // this.drawGraph(ctx);
+    this.drawRipples(ctx);
+    this.drawRippleBranches(ctx);
+    this.drawLogo(ctx);
     ctx.restore();
   };
   onMouseMove = e => {
@@ -168,32 +213,20 @@ class Ping extends Component {
     const { width, height } = this.state;
     const { pixelRatio } = this.ds;
     return (
-      <div
+      <canvas
+        ref={node => {
+          this.canvas = node;
+          this.draw(node);
+        }}
+        width={width * pixelRatio}
+        height={height * pixelRatio}
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          position: "absolute",
           width: `${width}px`,
           height: `${height}px`
         }}
-      >
-        <canvas
-          ref={node => {
-            this.canvas = node;
-            this.draw(node);
-          }}
-          width={width * pixelRatio}
-          height={height * pixelRatio}
-          style={{
-            position: "absolute",
-            width: `${width}px`,
-            height: `${height}px`
-          }}
-          onMouseMove={this.onMouseMove}
-          zIndex="-100"
-        />
-        <img src={logo} alt="PingThings" zIndex="100" width="300" />
-      </div>
+        onMouseMove={this.onMouseMove}
+      />
     );
   }
 }
