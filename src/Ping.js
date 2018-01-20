@@ -8,8 +8,8 @@ import logo from "./logo.svg";
 import { backgroundGray, supportGray, popGreen, popOrange } from "./colors";
 
 const frontierColors = {
-  green: d3interpolate.interpolate(popGreen, "rgba(255,255,255,0)")(0.6),
-  orange: d3interpolate.interpolate(popOrange, "rgba(255,255,255,0)")(0.6),
+  green: d3interpolate.interpolate(popGreen, "rgba(255,255,255,0)")(0.4),
+  orange: d3interpolate.interpolate(popOrange, "rgba(255,255,255,0)")(0.4),
   gray: d3interpolate.interpolate(backgroundGray, "rgba(255,255,255,0)")(0.4)
 };
 
@@ -23,21 +23,7 @@ class Ping extends Component {
       animDist: 0,
       animTail: 180
     };
-    const { points, triangles, graph } = this.randomMesh();
-    const root = Math.floor(Math.random() * points.length);
-    const { distMap, totalDist } = rippleMap(graph, root);
-    this.state.points = points;
-    this.state.triangles = triangles;
-    this.state.graph = graph;
-    this.state.distMap = distMap;
-    this.state.totalDist = totalDist + 1;
-    this.state.frontierTypes = points.map(_ => {
-      const t = Math.random();
-      if (t < 0.1) return "green";
-      if (t < 0.2) return "orange";
-      return "gray";
-    });
-
+    this.state.animData = this.randomAnimData();
     this.logo = new Image();
     this.logo.src = logo;
   }
@@ -66,8 +52,20 @@ class Ping extends Component {
       minAngle: 20 * Math.PI / 180
     });
   };
+  randomAnimData = () => {
+    const { points, triangles, graph } = this.randomMesh();
+    const root = Math.floor(Math.random() * points.length);
+    const { distMap, totalDist } = rippleMap(graph, root);
+    const frontierTypes = points.map(_ => {
+      const t = Math.random();
+      if (t < 0.1) return "green";
+      if (t < 0.2) return "orange";
+      return "gray";
+    });
+    return { points, triangles, graph, distMap, totalDist, frontierTypes };
+  };
   drawTriangles = ctx => {
-    const { points, triangles } = this.state;
+    const { points, triangles } = this.state.animData;
 
     ctx.fillStyle = "#f5f4f7";
     for (let indexes of triangles) {
@@ -81,7 +79,7 @@ class Ping extends Component {
     }
   };
   drawGraph = ctx => {
-    const { points, graph } = this.state;
+    const { points, graph } = this.state.animData;
     ctx.beginPath();
     for (let i = 0; i < graph.length; i++) {
       for (let j of Object.keys(graph[i])) {
@@ -96,7 +94,8 @@ class Ping extends Component {
     ctx.stroke();
   };
   drawRipples = (ctx, layer, layerOpt) => {
-    const { points, distMap, animDist, animTail, frontierTypes } = this.state;
+    const { animDist, animTail, animData } = this.state;
+    const { points, distMap, frontierTypes } = animData;
     for (let i of Object.keys(distMap)) {
       const node = distMap[i];
       const start = node.distFromRoot;
@@ -182,8 +181,8 @@ class Ping extends Component {
     ctx.save();
     ctx.scale(pixelRatio, pixelRatio);
     ctx.fillStyle = backgroundGray;
-    // ctx.clearRect(0, 0, width, height);
-    ctx.fillRect(0, 0, width, height);
+    ctx.clearRect(0, 0, width, height);
+    // ctx.fillRect(0, 0, width, height);
     // this.drawTriangles(ctx);
     // this.drawGraph(ctx);
     this.drawRipples(ctx, "frontier", "gray");
@@ -196,7 +195,8 @@ class Ping extends Component {
     const rect = this.canvas.getBoundingClientRect();
     // const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const { height, totalDist, animTail } = this.state;
+    const { height, animTail } = this.state;
+    const { totalDist } = this.state.animData;
     const pad = 40;
     const scale = d3scale
       .scaleLinear()

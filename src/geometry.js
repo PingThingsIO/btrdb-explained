@@ -167,7 +167,7 @@ function rippleMap(graph, root) {
     }
   }
 
-  const totalDist = distFromRoot;
+  const totalDist = distFromRoot + 1;
   return { distMap, totalDist };
 }
 
