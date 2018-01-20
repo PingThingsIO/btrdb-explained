@@ -2,6 +2,7 @@ import React, { Component } from "react";
 import * as d3array from "d3-array";
 import * as d3scale from "d3-scale";
 import * as d3interpolate from "d3-interpolate";
+import * as d3transition from "d3-transition";
 
 import { pointLookup, randomMesh, rippleMap, dist } from "./geometry";
 import logo from "./logo.svg";
@@ -12,6 +13,18 @@ const frontierColors = {
   orange: d3interpolate.interpolate(popOrange, "rgba(255,255,255,0)")(0.4),
   gray: d3interpolate.interpolate(backgroundGray, "rgba(255,255,255,0)")(0.4)
 };
+
+const delay = duration =>
+  new Promise((resolve, reject) => setTimeout(resolve, duration));
+
+const transition = (duration, tick) =>
+  new Promise((resolve, reject) =>
+    d3transition
+      .transition()
+      .duration(duration)
+      .tween("tween", () => tick)
+      .on("end", resolve)
+  );
 
 class Ping extends Component {
   constructor(props) {
@@ -26,6 +39,9 @@ class Ping extends Component {
     this.state.animData = this.randomAnimData();
     this.logo = new Image();
     this.logo.src = logo;
+  }
+  componentDidMount() {
+    this.startAnim();
   }
   componentWillMount() {
     this.computeDerivedState(this.props, this.state);
@@ -63,6 +79,27 @@ class Ping extends Component {
       return "gray";
     });
     return { points, triangles, graph, distMap, totalDist, frontierTypes };
+  };
+  startAnim = async () => {
+    if (this.animating) return;
+
+    this.animating = true;
+
+    const { animTail, animData } = this.state;
+    const { totalDist } = animData;
+
+    const animDistInterp = d3interpolate.interpolate(0, totalDist + animTail);
+    await transition(10000, t =>
+      this.setState({ animDist: animDistInterp(t) })
+    );
+
+    this.setState({
+      animData: this.randomAnimData(),
+      animDist: 0
+    });
+    await delay(1000);
+    this.animating = false;
+    this.startAnim();
   };
   drawTriangles = ctx => {
     const { points, triangles } = this.state.animData;
@@ -222,7 +259,7 @@ class Ping extends Component {
           width: `${width}px`,
           height: `${height}px`
         }}
-        onMouseMove={this.onMouseMove}
+        // onMouseMove={this.onMouseMove}
       />
     );
   }
