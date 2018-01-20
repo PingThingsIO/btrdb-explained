@@ -87,11 +87,22 @@ class Ping extends Component {
 
     const { animTail, animData } = this.state;
     const { totalDist } = animData;
+    const maxDist = totalDist + animTail;
 
-    const animDistInterp = d3interpolate.interpolate(0, totalDist + animTail);
-    await transition(10000, t =>
-      this.setState({ animDist: animDistInterp(t) })
-    );
+    const type = (() => {
+      const p = Math.random();
+      if (p < 0.8) return "straight";
+      return "meander";
+    })();
+
+    if (type === "straight") {
+      const interp = d3interpolate.interpolate(0, maxDist);
+      await transition(10000, t => this.setState({ animDist: interp(t) }));
+    } else if (type === "meander") {
+      const points = [0, maxDist, 0, maxDist];
+      const interp = d3interpolate.interpolateBasis(points);
+      await transition(15000, t => this.setState({ animDist: interp(t) }));
+    }
 
     this.setState({
       animData: this.randomAnimData(),
