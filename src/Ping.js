@@ -7,6 +7,12 @@ import { pointLookup, randomMesh, rippleMap, dist } from "./geometry";
 import logo from "./logo.svg";
 import { backgroundGray, supportGray, popGreen, popOrange } from "./colors";
 
+const frontierColors = {
+  green: d3interpolate.interpolate(popGreen, "rgba(255,255,255,0)")(0.6),
+  orange: d3interpolate.interpolate(popOrange, "rgba(255,255,255,0)")(0.6),
+  gray: d3interpolate.interpolate(backgroundGray, "rgba(255,255,255,0)")(0.4)
+};
+
 class Ping extends Component {
   constructor(props) {
     super(props);
@@ -15,7 +21,7 @@ class Ping extends Component {
       width: 1024,
       height: 600,
       animDist: 0,
-      animTail: 100
+      animTail: 180
     };
     const { points, triangles, graph } = this.randomMesh();
     const root = Math.floor(Math.random() * points.length);
@@ -25,17 +31,11 @@ class Ping extends Component {
     this.state.graph = graph;
     this.state.distMap = distMap;
     this.state.totalDist = totalDist + 1;
-    this.state.frontierColors = points.map(_ => {
+    this.state.frontierTypes = points.map(_ => {
       const t = Math.random();
-      if (t < 0.1) {
-        return d3interpolate.interpolate(popGreen, "rgba(255,255,255,0)")(0.6);
-      }
-      if (t < 0.2) {
-        return d3interpolate.interpolate(popOrange, "rgba(255,255,255,0)")(0.6);
-      }
-      return d3interpolate.interpolate(backgroundGray, "rgba(255,255,255,0)")(
-        0.4
-      );
+      if (t < 0.1) return "green";
+      if (t < 0.2) return "orange";
+      return "gray";
     });
 
     this.logo = new Image();
@@ -95,51 +95,8 @@ class Ping extends Component {
     ctx.strokeStyle = supportGray;
     ctx.stroke();
   };
-  drawRippleBranches = ctx => {
-    const { points, distMap, animDist, animTail } = this.state;
-    const lineColor = supportGray;
-    for (let i of Object.keys(distMap)) {
-      const node = distMap[i];
-      const start = node.distFromRoot;
-      for (let j of Object.keys(node.distTo)) {
-        const childDist = node.distTo[j];
-        const scale = d3scale
-          .scaleLinear()
-          .domain([start, start + childDist])
-          .range([0, 1])
-          .clamp(true);
-        const headT = scale(animDist);
-        const tailT = scale(animDist - animTail);
-        if (headT > 0 && tailT < 1) {
-          const [src, dst] = pointLookup(points, [i, j]);
-          const point = t => d3interpolate.interpolate(src, dst)(t);
-
-          const head = point(headT);
-          const tail = point(tailT);
-
-          ctx.beginPath();
-          ctx.strokeStyle = lineColor;
-          ctx.lineWidth = 3;
-          ctx.moveTo(head[0], head[1]);
-          ctx.lineTo(tail[0], tail[1]);
-          ctx.stroke();
-
-          const dot = p => {
-            const r = 4;
-            ctx.beginPath();
-            ctx.ellipse(p[0], p[1], r, r, 0, 0, 2 * Math.PI);
-            ctx.fillStyle = lineColor;
-            ctx.fill();
-          };
-
-          if (tailT === 0) dot(tail);
-          if (headT === 1) dot(head);
-        }
-      }
-    }
-  };
-  drawRipples = ctx => {
-    const { points, distMap, animDist, animTail, frontierColors } = this.state;
+  drawRipples = (ctx, layer, layerOpt) => {
+    const { points, distMap, animDist, animTail, frontierTypes } = this.state;
     for (let i of Object.keys(distMap)) {
       const node = distMap[i];
       const start = node.distFromRoot;
@@ -160,13 +117,43 @@ class Ping extends Component {
           const head = point(headT);
           const tail = point(tailT);
 
-          if (maxChildDist === childDist) {
-            const r = dist(point((headT + tailT) / 2), src);
-            ctx.beginPath();
-            ctx.ellipse(src[0], src[1], r, r, 0, 0, 2 * Math.PI);
-            ctx.lineWidth = dist(head, tail);
-            ctx.strokeStyle = frontierColors[i];
-            ctx.stroke();
+          switch (layer) {
+            case "frontier":
+              if (maxChildDist === childDist) {
+                const r = dist(point((headT + tailT) / 2), src);
+                ctx.beginPath();
+                ctx.ellipse(src[0], src[1], r, r, 0, 0, 2 * Math.PI);
+                ctx.lineWidth = dist(head, tail);
+                const type = frontierTypes[i];
+                if (
+                  (layerOpt === "gray" && type === "gray") ||
+                  (layerOpt === "pop" && type !== "gray")
+                ) {
+                  ctx.strokeStyle = frontierColors[type];
+                  ctx.stroke();
+                }
+              }
+              break;
+            case "branches":
+              ctx.strokeStyle = ctx.fillStyle = "#fff";
+              ctx.beginPath();
+              ctx.lineWidth = 4;
+              ctx.moveTo(head[0], head[1]);
+              ctx.lineTo(tail[0], tail[1]);
+              ctx.stroke();
+
+              const dot = p => {
+                const r = 8;
+                ctx.beginPath();
+                ctx.ellipse(p[0], p[1], r, r, 0, 0, 2 * Math.PI);
+                ctx.fill();
+              };
+
+              if (tailT === 0) dot(tail);
+              if (headT === 1) dot(head);
+              break;
+            default:
+              break;
           }
         }
       }
@@ -187,11 +174,14 @@ class Ping extends Component {
     const { width, height } = this.state;
     ctx.save();
     ctx.scale(pixelRatio, pixelRatio);
-    ctx.clearRect(0, 0, width, height);
+    // ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = backgroundGray;
+    ctx.fillRect(0, 0, width, height);
     // this.drawTriangles(ctx);
     // this.drawGraph(ctx);
-    this.drawRipples(ctx);
-    this.drawRippleBranches(ctx);
+    this.drawRipples(ctx, "frontier", "gray");
+    this.drawRipples(ctx, "frontier", "pop");
+    this.drawRipples(ctx, "branches");
     this.drawLogo(ctx);
     ctx.restore();
   };
