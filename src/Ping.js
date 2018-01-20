@@ -103,9 +103,10 @@ class Ping extends Component {
       const maxChildDist = d3array.max(Object.values(node.distTo));
       for (let j of Object.keys(node.distTo)) {
         const childDist = node.distTo[j];
+        const end = start + childDist;
         const scale = d3scale
           .scaleLinear()
-          .domain([start, start + childDist])
+          .domain([start, end])
           .range([0, 1])
           .clamp(true);
         const headT = scale(animDist);
@@ -142,15 +143,21 @@ class Ping extends Component {
               ctx.lineTo(tail[0], tail[1]);
               ctx.stroke();
 
-              const dot = p => {
-                const r = 8;
-                ctx.beginPath();
-                ctx.ellipse(p[0], p[1], r, r, 0, 0, 2 * Math.PI);
-                ctx.fill();
-              };
-
-              if (tailT === 0) dot(tail);
-              if (headT === 1) dot(head);
+              const maxR = 8;
+              const padR = maxR * 3;
+              const r = d3scale
+                .scaleLinear()
+                .domain([
+                  end,
+                  end + padR,
+                  end + animTail - padR,
+                  end + animTail
+                ])
+                .range([0, maxR, maxR, 0])
+                .clamp(true)(animDist);
+              ctx.beginPath();
+              ctx.ellipse(dst[0], dst[1], r, r, 0, 0, 2 * Math.PI);
+              ctx.fill();
               break;
             default:
               break;
@@ -174,8 +181,8 @@ class Ping extends Component {
     const { width, height } = this.state;
     ctx.save();
     ctx.scale(pixelRatio, pixelRatio);
-    // ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = backgroundGray;
+    // ctx.clearRect(0, 0, width, height);
     ctx.fillRect(0, 0, width, height);
     // this.drawTriangles(ctx);
     // this.drawGraph(ctx);
