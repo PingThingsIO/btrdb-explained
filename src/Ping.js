@@ -1,4 +1,5 @@
 import React, { Component } from "react";
+import * as d3array from "d3-array";
 import * as d3scale from "d3-scale";
 import * as d3interpolate from "d3-interpolate";
 import { pointLookup, randomMesh, rippleMap, dist } from "./geometry";
@@ -79,12 +80,14 @@ class Ping extends Component {
   drawRippleMap = ctx => {
     const { points, distMap, animDist, animTail } = this.state;
     for (let i of Object.keys(distMap)) {
-      const start = distMap[i].distFromRoot;
-      for (let j of Object.keys(distMap[i].distTo)) {
-        const distTo = distMap[i].distTo[j];
+      const node = distMap[i];
+      const start = node.distFromRoot;
+      const maxChildDist = d3array.max(Object.values(node.distTo));
+      for (let j of Object.keys(node.distTo)) {
+        const childDist = node.distTo[j];
         const scale = d3scale
           .scaleLinear()
-          .domain([start, start + distTo])
+          .domain([start, start + childDist])
           .range([0, 1])
           .clamp(true);
         const t0 = scale(animDist);
@@ -96,16 +99,21 @@ class Ping extends Component {
           const start = point(t0);
           const end = point(t1);
 
-          const r = dist(point((t0 + t1) / 2), end);
-          ctx.beginPath();
-          ctx.ellipse(src[0], src[1], r, r, 0, 0, 2 * Math.PI);
-          ctx.lineWidth = dist(start, end);
-          ctx.strokeStyle = "rgba(0,0,0,0.1)";
-          ctx.stroke();
+          if (maxChildDist === childDist) {
+            const r = dist(point((t0 + t1) / 2), src);
+            ctx.beginPath();
+            ctx.ellipse(src[0], src[1], r, r, 0, 0, 2 * Math.PI);
+            ctx.lineWidth = dist(start, end);
+            ctx.strokeStyle = d3interpolate.interpolate(
+              "#789",
+              "rgba(0,0,0,0)"
+            )(0.8);
+            ctx.stroke();
+          }
 
           // draw dist
           ctx.beginPath();
-          ctx.strokeStyle = "#000";
+          ctx.strokeStyle = "#789";
           ctx.lineWidth = 3;
           ctx.moveTo(start[0], start[1]);
           ctx.lineTo(end[0], end[1]);
@@ -122,8 +130,10 @@ class Ping extends Component {
     ctx.save();
     ctx.scale(pixelRatio, pixelRatio);
     ctx.clearRect(0, 0, width, height);
+    ctx.globalAlpha = 0.4;
     this.drawTriangles(ctx);
     this.drawGraph(ctx);
+    ctx.globalAlpha = 1;
     this.drawRippleMap(ctx);
     ctx.restore();
   };
