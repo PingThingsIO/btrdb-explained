@@ -583,6 +583,9 @@ class Viz extends Component {
   isLevelVisible = level => {
     return level < Math.floor(this.state.pathAnim);
   };
+  isCellExpanded = (level, cell) => {
+    return this.state.path[level + 1] === cell;
+  };
   mouseToPath = (x, y) => {
     const { treeX, treeY, treeCellW, treeCellH, levelOffset } = this.state;
 
@@ -611,28 +614,45 @@ class Viz extends Component {
     const t = scale(y);
     this.setState({ pathAnim: t });
   };
-  onMouseDown = e => {
+  onMouseDown = (e, { isDrag }) => {
     const { x, y } = this.getMousePos(e);
     const cellHighlight = this.mouseToPath(x, y);
     if (cellHighlight) {
       const { level, cell } = cellHighlight;
-      if (this.isLevelVisible(level + 1)) {
+      if (this.isLevelVisible(level + 1) && !this.isCellExpanded(level, cell)) {
         const path = this.state.path.slice(0, level + 1);
         path.push(cell);
         this.setState({ path, pathAnim: level + 2 });
       }
       this.mousedownLevel = level;
+      if (!isDrag) {
+        this.mousedownCell = cell;
+        this.shouldCollapseOnMouseUp = this.isCellExpanded(level, cell);
+      } else if (cell !== this.mousedownCell) {
+        this.shouldCollapseOnMouseUp = false;
+      }
     }
   };
   onMouseUp = e => {
     this.mousedownLevel = null;
-    const { cellHighlight } = this.state;
+    const { cellHighlight, pathAnim } = this.state;
     if (cellHighlight) {
       const { level, cell } = cellHighlight;
-      if (!this.isLevelVisible(level + 1)) {
-        const path = this.state.path.slice(0, level + 1);
-        path.push(cell);
-        this.setState({ path });
+      const parentPath = this.state.path.slice(0, level + 1);
+      if (this.isLevelVisible(level + 1)) {
+        const interp = d3interpolate.interpolate(pathAnim, level + 1);
+        if (this.shouldCollapseOnMouseUp) {
+          d3transition
+            .transition()
+            .duration(500)
+            .tween("collapse-cell", () => t =>
+              this.setState({ pathAnim: interp(t) })
+            )
+            .on("end", () => this.setState({ path: parentPath }));
+        }
+      } else {
+        parentPath.push(cell);
+        this.setState({ path: parentPath });
         d3transition
           .transition()
           .duration(500)
@@ -654,7 +674,7 @@ class Viz extends Component {
         this.setState({ cellHighlight: curr });
       }
       if (curr && this.mousedownLevel === curr.level) {
-        this.onMouseDown(e);
+        this.onMouseDown(e, { isDrag: true });
       }
     }
   };
@@ -680,9 +700,13 @@ class Viz extends Component {
         }}
         width={width * pixelRatio}
         height={height * pixelRatio}
-        style={{ outline: 0, width: `${width}px`, height: `${height}px` }}
+        style={{
+          width: `${width}px`,
+          height: `${height}px`,
+          userSelect: "none"
+        }}
         onMouseMove={this.onMouseMove}
-        onMouseDown={this.onMouseDown}
+        onMouseDown={e => this.onMouseDown(e, { isDrag: false })}
         onMouseUp={this.onMouseUp}
         onDragStart={() => false}
       />
