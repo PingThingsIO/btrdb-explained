@@ -570,7 +570,7 @@ class Viz extends Component {
     ctx.scale(pixelRatio, pixelRatio);
     ctx.clearRect(0, 0, width, height);
     this.drawTree(ctx);
-    this.drawCalendar(ctx);
+    // this.drawCalendar(ctx);
     ctx.restore();
   };
   getMousePos = e => {
@@ -611,6 +611,37 @@ class Viz extends Component {
     const t = scale(y);
     this.setState({ pathAnim: t });
   };
+  onMouseDown = e => {
+    const { x, y } = this.getMousePos(e);
+    const cellHighlight = this.mouseToPath(x, y);
+    if (cellHighlight) {
+      const { level, cell } = cellHighlight;
+      if (this.isLevelVisible(level + 1)) {
+        const path = this.state.path.slice(0, level + 1);
+        path.push(cell);
+        this.setState({ path, pathAnim: level + 2 });
+      }
+      this.mousedown = true;
+    }
+  };
+  onMouseUp = e => {
+    this.mousedown = false;
+    const { cellHighlight } = this.state;
+    if (cellHighlight) {
+      const { level, cell } = cellHighlight;
+      if (!this.isLevelVisible(level + 1)) {
+        const path = this.state.path.slice(0, level + 1);
+        path.push(cell);
+        this.setState({ path });
+        d3transition
+          .transition()
+          .duration(500)
+          .tween("expand-cell", () => t =>
+            this.setState({ pathAnim: level + 1 + t })
+          );
+      }
+    }
+  };
   onMouseMove = e => {
     const { x, y } = this.getMousePos(e);
     if (this.scrubbing) {
@@ -622,22 +653,9 @@ class Viz extends Component {
       if (JSON.stringify(curr) !== JSON.stringify(prev)) {
         this.setState({ cellHighlight: curr });
       }
-    }
-  };
-  onClick = e => {
-    const { cellHighlight } = this.state;
-    if (cellHighlight) {
-      const { level, cell } = cellHighlight;
-      // set path
-      const path = this.state.path.slice(0, level + 1);
-      path.push(cell);
-      this.setState({ path });
-      d3transition
-        .transition()
-        .duration(500)
-        .tween("expand-cell", () => t =>
-          this.setState({ pathAnim: level + 1 + t })
-        );
+      if (this.mousedown) {
+        this.onMouseDown(e);
+      }
     }
   };
   onKeyDown = e => {
@@ -664,7 +682,9 @@ class Viz extends Component {
         height={height * pixelRatio}
         style={{ outline: 0, width: `${width}px`, height: `${height}px` }}
         onMouseMove={this.onMouseMove}
-        onClick={this.onClick}
+        onMouseDown={this.onMouseDown}
+        onMouseUp={this.onMouseUp}
+        onDragStart={() => false}
       />
     );
   }
