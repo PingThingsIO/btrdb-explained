@@ -325,10 +325,39 @@ class Viz extends Component {
 
     ctx.restore();
   };
+  getTreeHeight = () => {
+    const { path, levelOffset, treeCellH } = this.state;
+    return (path.length - 1) * levelOffset * treeCellH + treeCellH;
+  };
+  drawScrubGuide = ctx => {
+    const { scrubbing, path, pathAnim } = this.state;
+    if (!scrubbing) return;
+    ctx.save();
+    ctx.strokeStyle = "#e7e8e9";
+    ctx.translate(-30, 0);
+    const barH = 32;
+    const treeH = this.getTreeHeight();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, treeH);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    const y = d3scale
+      .scaleLinear()
+      .domain([1, path.length])
+      .range([0, treeH - barH])(pathAnim);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(0, y + barH);
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.restore();
+  };
   drawTree = ctx => {
     ctx.save();
     const { treeX, treeY, treeCellH, levelOffset, path } = this.state;
     ctx.translate(treeX, treeY);
+    // this.drawScrubGuide(ctx);
     for (let level = 0; level < path.length; level++) {
       this.drawTreeNode(ctx, level);
       ctx.translate(0, treeCellH * levelOffset);
@@ -574,7 +603,7 @@ class Viz extends Component {
     ctx.restore();
   };
   getMousePos = e => {
-    if (!e) return this.lastMouse;
+    if (!e) return this.lastMouse || { x: 0, y: 0 };
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -604,10 +633,10 @@ class Viz extends Component {
     // TODO: compute "derived" resolution cells
   };
   scrubAnim = (x, y) => {
-    const { treeY, levelOffset, treeCellH, path } = this.state;
+    const { treeY, path } = this.state;
     const t = d3scale
       .scaleLinear()
-      .domain([treeY, treeY + (path.length - 1) * levelOffset * treeCellH])
+      .domain([treeY, treeY + this.getTreeHeight()])
       .range([1, path.length])
       .clamp(true)(y);
     this.setState({ pathAnim: t });
@@ -670,7 +699,7 @@ class Viz extends Component {
   };
   onMouseMove = e => {
     const { x, y } = this.getMousePos(e);
-    if (this.scrubbing) {
+    if (this.state.scrubbing) {
       this.scrubAnim(x, y);
     } else {
       const curr = this.mouseToPath(x, y);
@@ -686,13 +715,13 @@ class Viz extends Component {
   };
   onKeyDown = e => {
     if (e.key === "Shift") {
-      this.scrubbing = true;
+      this.setState({ scrubbing: true });
       this.onMouseMove();
     }
   };
   onKeyUp = e => {
     if (e.key === "Shift") {
-      this.scrubbing = false;
+      this.setState({ scrubbing: false });
     } else if (e.key === "Enter") {
       this.cancelTransitions();
       const { pathAnim, path } = this.state;
