@@ -2,8 +2,9 @@ import React, { Component } from "react";
 import * as d3scale from "d3-scale";
 import { scaleTimeNano } from "./scaleTimeNano";
 import * as d3interpolate from "d3-interpolate";
-// import * as d3ease from "d3-ease";
-// import * as d3transition from "d3-transition";
+import * as d3ease from "d3-ease";
+import * as d3transition from "d3-transition";
+import hexToRgba from "hex-to-rgba";
 // import * as d3shape from "d3-shape";
 
 const nodeLengthLabels = [
@@ -19,6 +20,23 @@ const nodeLengthLabels = [
   "256 ns",
   "4 ns"
 ];
+const theme = {
+  green: "#1eb7aa",
+  orange: "#db7b35"
+};
+const colors = {
+  cellFillExpanded: "rgba(80,100,120, 0.15)",
+  cellFillHighlight: hexToRgba(theme.green, 0.4),
+  cellWall: hexToRgba("#555", 0.1),
+  cellWallExpanded: "#555",
+  cellWallHighlight: theme.green,
+
+  unixEpoch: theme.green,
+  now: theme.orange,
+  dateTick: "rgba(90,110,100, 0.5)",
+  scrub: "#e7e8e9",
+  zoomCone: "rgba(80,100,120, 0.15)"
+};
 
 class Viz extends Component {
   constructor(props) {
@@ -26,20 +44,21 @@ class Viz extends Component {
     this.state = {
       // canvas
       width: 1024,
-      height: 600,
+      height: 720,
 
       numCells: 64, // cells in a tree row
       numSquareCells: 8, // cells in a calendar row
 
-      path: [0],
-      pathAnim: 1,
+      path: [0], // first of path is ignored for generality
+      pathAnim: 1, // float representing what index of the path we are showing
 
       // Tree placement and sizing
       treeCellW: 8,
       treeCellH: 12,
       treeX: 40,
-      treeY: 40,
+      treeY: 34,
       levelOffset: 5,
+      cellHighlight: {},
 
       // Calendar placement and sizing
       calCellSize: 38,
@@ -60,6 +79,14 @@ class Viz extends Component {
   }
   componentWillUpdate(nextProps, nextState) {
     this.computeDerivedState(nextProps, nextState);
+  }
+  componentDidMount() {
+    window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
+  }
+  componentWillUnmount() {
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
   }
   createD3Objects = () => {
     this.d3 = {};
@@ -150,15 +177,24 @@ class Viz extends Component {
     };
   };
   drawTreeCell = (ctx, level, cell) => {
-    const { treeCellH, treeCellW, path } = this.state;
-    const child = path[level + 1];
-    ctx.globalAlpha = child === cell ? 1 : 0.1;
-    ctx.strokeRect(0, 0, treeCellW, treeCellH);
-    if (child === cell) {
-      ctx.fillStyle = "rgba(0,0,0,0.2)";
-      ctx.fillStyle = "rgba(80,100,120, 0.15)";
-      ctx.fillRect(0, 0, treeCellW, treeCellH);
+    const { treeCellH, treeCellW, cellHighlight } = this.state;
+    const expanded = this.isCellExpanded(level, cell);
+    const highlighted =
+      cellHighlight &&
+      cellHighlight.cell === cell &&
+      cellHighlight.level === level;
+    if (highlighted) {
+      ctx.strokeStyle = colors.cellWallHighlight;
+      ctx.fillStyle = colors.cellFillHighlight;
+    } else if (expanded) {
+      ctx.strokeStyle = colors.cellWallExpanded;
+      ctx.fillStyle = colors.cellFillExpanded;
+    } else {
+      ctx.strokeStyle = colors.cellWall;
+      ctx.fillStyle = "rgba(0,0,0,0)";
     }
+    ctx.fillRect(0, 0, treeCellW, treeCellH);
+    ctx.strokeRect(0, 0, treeCellW, treeCellH);
   };
   drawTreeNode = (ctx, level) => {
     const {
@@ -221,7 +257,7 @@ class Viz extends Component {
     ctx.save();
 
     // Draw zooming cone that connects previous level to this one
-    ctx.fillStyle = "rgba(80,100,120, 0.15)";
+    ctx.fillStyle = colors.zoomCone;
     if (level > 0 && t > dipTime) {
       const ytop = scaleY(0) + treeCellH + 1;
       ctx.beginPath();
@@ -240,7 +276,6 @@ class Viz extends Component {
     ctx.fillRect(0, 0, w, treeCellH);
 
     // Draw inner cells
-    ctx.strokeStyle = "#555";
     if (t === 1) {
       ctx.save();
       for (let cell = 0; cell < numCells; cell++) {
@@ -270,13 +305,13 @@ class Viz extends Component {
         ctx.stroke();
         ctx.fillText(title, x, treeRowY(-2));
       };
-      drawTick(0, "#1eb7aa", "unix epoch");
-      drawTick(+new Date() * 1e6, "#db7b35", "now");
+      drawTick(0, colors.unixEpoch, "unix epoch");
+      drawTick(+new Date() * 1e6, colors.now, "now");
     }
 
     // Draw the date ticks
     if (t === 1) {
-      ctx.strokeStyle = ctx.fillStyle = "rgba(90,110,100, 0.5)";
+      ctx.strokeStyle = ctx.fillStyle = colors.dateTick;
       const drawTick = (t, title) => {
         const x = treeTimeX[level](t);
         ctx.beginPath();
@@ -306,10 +341,39 @@ class Viz extends Component {
 
     ctx.restore();
   };
+  getTreeHeight = () => {
+    const { path, levelOffset, treeCellH } = this.state;
+    return (path.length - 1) * levelOffset * treeCellH + treeCellH;
+  };
+  drawScrubGuide = ctx => {
+    const { scrubbing, path, pathAnim } = this.state;
+    if (!scrubbing) return;
+    ctx.save();
+    ctx.strokeStyle = colors.scrub;
+    ctx.translate(-30, 0);
+    const barH = 32;
+    const treeH = this.getTreeHeight();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, treeH);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    const y = d3scale
+      .scaleLinear()
+      .domain([1, path.length])
+      .range([0, treeH - barH])(pathAnim);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(0, y + barH);
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.restore();
+  };
   drawTree = ctx => {
     ctx.save();
     const { treeX, treeY, treeCellH, levelOffset, path } = this.state;
     ctx.translate(treeX, treeY);
+    // this.drawScrubGuide(ctx);
     for (let level = 0; level < path.length; level++) {
       this.drawTreeNode(ctx, level);
       ctx.translate(0, treeCellH * levelOffset);
@@ -371,12 +435,12 @@ class Viz extends Component {
           y += 12;
         }
       };
-      drawTick(0, "#1eb7aa", "unix\nepoch");
-      drawTick(+new Date() * 1e6, "#db7b35", "now");
+      drawTick(0, colors.unixEpoch, "unix\nepoch");
+      drawTick(+new Date() * 1e6, colors.now, "now");
     }
 
     ctx.lineWidth /= 2;
-    ctx.strokeStyle = ctx.fillStyle = "rgba(90,110,100, 0.5)";
+    ctx.strokeStyle = ctx.fillStyle = colors.dateTick;
     const drawTick = (t, title) => {
       const k = calTimeK[level](t);
       const x = calKX(k);
@@ -499,7 +563,7 @@ class Viz extends Component {
     };
 
     // draw parent
-    const gridColor = d3interpolate.interpolate("#fff", "#555")(0.3);
+    const gridColor = d3interpolate.interpolate("#fff", colors.cellWall)(0.3);
     ctx.strokeStyle = gridColor;
     ctx.save();
     transformToParent();
@@ -530,14 +594,15 @@ class Viz extends Component {
     // outline child
     ctx.save();
     transformToChild();
-    ctx.strokeStyle = d3interpolate.interpolate("rgba(0,0,0,0)", "#555")(
-      highlightT
-    );
+    ctx.strokeStyle = d3interpolate.interpolate(
+      "rgba(0,0,0,0)",
+      colors.cellWall
+    )(highlightT);
     ctx.strokeRect(0, 0, calW, calW);
     ctx.restore();
 
     // outline window
-    ctx.strokeStyle = "#555";
+    ctx.strokeStyle = colors.cellWall;
     ctx.strokeRect(0, 0, calW, calW);
 
     ctx.restore();
@@ -551,25 +616,166 @@ class Viz extends Component {
     ctx.scale(pixelRatio, pixelRatio);
     ctx.clearRect(0, 0, width, height);
     this.drawTree(ctx);
-    this.drawCalendar(ctx);
+    // this.drawCalendar(ctx);
     ctx.restore();
   };
-  onMouseMove = e => {
+  getMousePos = e => {
+    if (!e) return this.lastMouse || { x: 0, y: 0 };
     const rect = this.canvas.getBoundingClientRect();
-    // const x = e.clientX - rect.left;
+    const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const { height, path } = this.state;
-    const pad = 40;
-    const scale = d3scale
+    return (this.lastMouse = { x, y });
+  };
+  isLevelVisible = level => {
+    return level < Math.floor(this.state.pathAnim);
+  };
+  isCellExpanded = (level, cell) => {
+    return this.state.path[level + 1] === cell;
+  };
+  mouseToPath = (x, y) => {
+    const { treeX, treeY, treeCellW, treeCellH, levelOffset } = this.state;
+
+    const cell = Math.floor((x - treeX) / treeCellW);
+    const gridY = Math.floor((y - treeY) / treeCellH);
+    const level = Math.floor(gridY / levelOffset);
+    if (
+      cell >= 0 &&
+      cell < 64 &&
+      gridY % levelOffset === 0 &&
+      this.isLevelVisible(level)
+    ) {
+      return { level, cell };
+    }
+
+    // TODO: compute "derived" resolution cells
+  };
+  scrubAnim = (x, y) => {
+    const { treeY, path } = this.state;
+    const t = d3scale
       .scaleLinear()
-      .domain([pad, height - pad])
+      .domain([treeY, treeY + this.getTreeHeight()])
       .range([1, path.length])
-      .clamp(true);
-    const t = scale(y);
+      .clamp(true)(y);
     this.setState({ pathAnim: t });
   };
+  onMouseDown = (e, { isDrag }) => {
+    const { x, y } = this.getMousePos(e);
+    const cellHighlight = this.mouseToPath(x, y);
+    if (cellHighlight) {
+      const { level, cell } = cellHighlight;
+      if (this.isLevelVisible(level + 1) && !this.isCellExpanded(level, cell)) {
+        const path = this.state.path.slice(0, level + 1);
+        path.push(cell);
+        this.setState({ path, pathAnim: level + 2 });
+      }
+      this.mousedownLevel = level;
+      if (!isDrag) {
+        this.mousedownCell = cell;
+        this.shouldCollapseOnMouseUp = this.isCellExpanded(level, cell);
+      } else if (cell !== this.mousedownCell) {
+        this.shouldCollapseOnMouseUp = false;
+      }
+    }
+  };
+  cancelTransitions = () => {
+    d3transition.interrupt("collapse-cell");
+    d3transition.interrupt("expand-cell");
+    d3transition.interrupt("collapse-all");
+    d3transition.interrupt("expand-all");
+  };
+  onMouseUp = e => {
+    this.mousedownLevel = null;
+    const { cellHighlight, pathAnim } = this.state;
+    if (cellHighlight) {
+      const { level, cell } = cellHighlight;
+      const parentPath = this.state.path.slice(0, level + 1);
+      if (this.isLevelVisible(level + 1)) {
+        const interp = d3interpolate.interpolate(pathAnim, level + 1);
+        if (this.shouldCollapseOnMouseUp) {
+          this.cancelTransitions();
+          d3transition
+            .transition("collapse-cell")
+            .duration(500)
+            .tween("pathAnim", () => t =>
+              this.setState({ pathAnim: interp(t) })
+            )
+            .on("end", () => this.setState({ path: parentPath }));
+        }
+      } else {
+        parentPath.push(cell);
+        this.setState({ path: parentPath });
+        this.cancelTransitions();
+        d3transition
+          .transition("expand-cell")
+          .duration(500)
+          .tween("pathAnim", () => t =>
+            this.setState({ pathAnim: level + 1 + t })
+          );
+      }
+    }
+  };
+  onMouseMove = e => {
+    const { x, y } = this.getMousePos(e);
+    if (this.state.scrubbing) {
+      this.scrubAnim(x, y);
+    } else {
+      const curr = this.mouseToPath(x, y);
+      const prev = this.state.cellHighlight;
+      this.setState({
+        cursor: curr ? "pointer" : "default"
+      });
+      if (JSON.stringify(curr) !== JSON.stringify(prev)) {
+        this.setState({ cellHighlight: curr });
+      }
+      if (curr && this.mousedownLevel === curr.level) {
+        this.onMouseDown(e, { isDrag: true });
+      }
+    }
+  };
+  onKeyDown = e => {
+    if (e.key === "Shift") {
+      this.setState({ scrubbing: true });
+      this.setState({ cursor: "grabbing" });
+      this.onMouseMove();
+    }
+  };
+  onKeyUp = e => {
+    if (e.key === "Shift") {
+      this.setState({ scrubbing: false });
+      this.setState({ cursor: "default" });
+    } else if (e.key === "Enter") {
+      this.cancelTransitions();
+      const { pathAnim, path } = this.state;
+      const durationPerLevel = 125;
+      if (pathAnim > 1) {
+        const interp = d3interpolate.interpolate(pathAnim, 1);
+        const dist = pathAnim - 1;
+        const duration = dist * durationPerLevel;
+        d3transition
+          .transition("collapse-all")
+          .ease(d3ease.easeLinear)
+          .duration(duration)
+          .tween("pathAnim", () => t => this.setState({ pathAnim: interp(t) }));
+      } else {
+        const interp = d3interpolate.interpolate(pathAnim, path.length);
+        const dist = path.length - pathAnim;
+        const duration = dist * durationPerLevel;
+        d3transition
+          .transition("expand-all")
+          .ease(d3ease.easeLinear)
+          .duration(duration)
+          .tween("pathAnim", () => t => this.setState({ pathAnim: interp(t) }));
+      }
+    }
+  };
+  getCssCursor = cursor => {
+    if (cursor === "grabbing") {
+      cursor = "-webkit-grabbing";
+    }
+    return cursor;
+  };
   render() {
-    const { width, height } = this.state;
+    const { width, height, cursor } = this.state;
     const { pixelRatio } = this.ds;
     return (
       <canvas
@@ -579,8 +785,16 @@ class Viz extends Component {
         }}
         width={width * pixelRatio}
         height={height * pixelRatio}
-        style={{ width: `${width}px`, height: `${height}px` }}
+        style={{
+          width: `${width}px`,
+          height: `${height}px`,
+          userSelect: "none",
+          cursor: this.getCssCursor(cursor)
+        }}
         onMouseMove={this.onMouseMove}
+        onMouseDown={e => this.onMouseDown(e, { isDrag: false })}
+        onMouseUp={this.onMouseUp}
+        onDragStart={() => false}
       />
     );
   }

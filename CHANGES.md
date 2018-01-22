@@ -1,3 +1,12 @@
+## v2018.01.22
+
+[screenshot][screenshot-2018-01-22] | [demo permalink][demo-2018-01-22]
+
+- Add mouse controls for exploring the tree
+
+[screenshot-2018-01-22]:https://user-images.githubusercontent.com/116838/35245661-a2e4ad26-ff89-11e7-83a2-4db239a4ed4a.gif
+[demo-2018-01-22]:http://btrdb-viz-2018-01-22.surge.sh
+
 ## v2018.01.11
 
 [screenshot][screenshot-2018-01-11] | [demo permalink][demo-2018-01-11]
