@@ -57,7 +57,7 @@ class Viz extends Component {
       treeCellH: 12,
       treeX: 40,
       treeY: 34,
-      levelOffset: 6,
+      levelOffset: 5,
       cellHighlight: {},
 
       // Calendar placement and sizing
