@@ -631,6 +631,12 @@ class Viz extends Component {
       }
     }
   };
+  cancelTransitions = () => {
+    d3transition.interrupt("collapse-cell");
+    d3transition.interrupt("expand-cell");
+    d3transition.interrupt("collapse-all");
+    d3transition.interrupt("expand-all");
+  };
   onMouseUp = e => {
     this.mousedownLevel = null;
     const { cellHighlight, pathAnim } = this.state;
@@ -640,6 +646,7 @@ class Viz extends Component {
       if (this.isLevelVisible(level + 1)) {
         const interp = d3interpolate.interpolate(pathAnim, level + 1);
         if (this.shouldCollapseOnMouseUp) {
+          this.cancelTransitions();
           d3transition
             .transition("collapse-cell")
             .duration(500)
@@ -651,6 +658,7 @@ class Viz extends Component {
       } else {
         parentPath.push(cell);
         this.setState({ path: parentPath });
+        this.cancelTransitions();
         d3transition
           .transition("expand-cell")
           .duration(500)
@@ -686,10 +694,7 @@ class Viz extends Component {
     if (e.key === "Shift") {
       this.scrubbing = false;
     } else if (e.key === "Enter") {
-      d3transition.interrupt("collapse-all");
-      d3transition.interrupt("expand-all");
-      d3transition.interrupt("collapse-cell");
-      d3transition.interrupt("expand-cell");
+      this.cancelTransitions();
       const { pathAnim, path } = this.state;
       const durationPerLevel = 125;
       if (pathAnim > 1) {
