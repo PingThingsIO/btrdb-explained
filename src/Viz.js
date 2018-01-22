@@ -704,7 +704,9 @@ class Viz extends Component {
     } else {
       const curr = this.mouseToPath(x, y);
       const prev = this.state.cellHighlight;
-      this.canvas.style.cursor = curr ? "pointer" : "default";
+      this.setState({
+        cursor: curr ? "pointer" : "default"
+      });
       if (JSON.stringify(curr) !== JSON.stringify(prev)) {
         this.setState({ cellHighlight: curr });
       }
@@ -716,12 +718,14 @@ class Viz extends Component {
   onKeyDown = e => {
     if (e.key === "Shift") {
       this.setState({ scrubbing: true });
+      this.setState({ cursor: "grabbing" });
       this.onMouseMove();
     }
   };
   onKeyUp = e => {
     if (e.key === "Shift") {
       this.setState({ scrubbing: false });
+      this.setState({ cursor: "default" });
     } else if (e.key === "Enter") {
       this.cancelTransitions();
       const { pathAnim, path } = this.state;
@@ -747,8 +751,14 @@ class Viz extends Component {
       }
     }
   };
+  getCssCursor = cursor => {
+    if (cursor === "grabbing") {
+      cursor = "-webkit-grabbing";
+    }
+    return cursor;
+  };
   render() {
-    const { width, height } = this.state;
+    const { width, height, cursor } = this.state;
     const { pixelRatio } = this.ds;
     return (
       <canvas
@@ -761,7 +771,8 @@ class Viz extends Component {
         style={{
           width: `${width}px`,
           height: `${height}px`,
-          userSelect: "none"
+          userSelect: "none",
+          cursor: this.getCssCursor(cursor)
         }}
         onMouseMove={this.onMouseMove}
         onMouseDown={e => this.onMouseDown(e, { isDrag: false })}
