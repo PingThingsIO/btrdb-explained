@@ -20,15 +20,19 @@ const nodeLengthLabels = [
   "256 ns",
   "4 ns"
 ];
+const theme = {
+  green: "#1eb7aa",
+  orange: "#db7b35"
+};
 const colors = {
   cellFillExpanded: "rgba(80,100,120, 0.15)",
-  cellFillHighlight: hexToRgba("#db7b35", 0.4),
+  cellFillHighlight: hexToRgba(theme.green, 0.4),
   cellWall: hexToRgba("#555", 0.1),
   cellWallExpanded: "#555",
-  cellWallHighlight: "#db7b35",
+  cellWallHighlight: theme.green,
 
-  unixEpoch: "#1eb7aa",
-  now: "rgba(90,110,100, 0.7)",
+  unixEpoch: theme.orange,
+  now: theme.green,
   dateTick: "rgba(90,110,100, 0.5)",
   scrub: "#e7e8e9",
   zoomCone: "rgba(80,100,120, 0.15)"
@@ -40,7 +44,7 @@ class Viz extends Component {
     this.state = {
       // canvas
       width: 1024,
-      height: 600,
+      height: 720,
 
       numCells: 64, // cells in a tree row
       numSquareCells: 8, // cells in a calendar row
@@ -52,8 +56,8 @@ class Viz extends Component {
       treeCellW: 8,
       treeCellH: 12,
       treeX: 40,
-      treeY: 40,
-      levelOffset: 5,
+      treeY: 34,
+      levelOffset: 6,
       cellHighlight: {},
 
       // Calendar placement and sizing
