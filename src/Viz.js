@@ -4,6 +4,7 @@ import { scaleTimeNano } from "./scaleTimeNano";
 import * as d3interpolate from "d3-interpolate";
 import * as d3ease from "d3-ease";
 import * as d3transition from "d3-transition";
+import hexToRgba from "hex-to-rgba";
 // import * as d3shape from "d3-shape";
 
 const nodeLengthLabels = [
@@ -19,6 +20,19 @@ const nodeLengthLabels = [
   "256 ns",
   "4 ns"
 ];
+const colors = {
+  cellFillExpanded: "rgba(80,100,120, 0.15)",
+  cellFillHighlight: hexToRgba("#db7b35", 0.4),
+  cellWall: hexToRgba("#555", 0.1),
+  cellWallExpanded: "#555",
+  cellWallHighlight: "#db7b35",
+
+  unixEpoch: "#1eb7aa",
+  now: "rgba(90,110,100, 0.7)",
+  dateTick: "rgba(90,110,100, 0.5)",
+  scrub: "#e7e8e9",
+  zoomCone: "rgba(80,100,120, 0.15)"
+};
 
 class Viz extends Component {
   constructor(props) {
@@ -159,26 +173,24 @@ class Viz extends Component {
     };
   };
   drawTreeCell = (ctx, level, cell) => {
-    const { treeCellH, treeCellW, path, cellHighlight } = this.state;
-    const child = path[level + 1];
-    ctx.globalAlpha = child === cell ? 1 : 0.1;
-    ctx.strokeStyle = "#555";
-    ctx.strokeRect(0, 0, treeCellW, treeCellH);
-    if (child === cell) {
-      ctx.fillStyle = "rgba(80,100,120, 0.15)";
-      ctx.fillRect(0, 0, treeCellW, treeCellH);
-    }
-    ctx.globalAlpha = 1;
-    if (
+    const { treeCellH, treeCellW, cellHighlight } = this.state;
+    const expanded = this.isCellExpanded(level, cell);
+    const highlighted =
       cellHighlight &&
       cellHighlight.cell === cell &&
-      cellHighlight.level === level
-    ) {
-      ctx.fillStyle = ctx.strokeStyle = "#1eb7aa";
-      ctx.strokeRect(0, 0, treeCellW, treeCellH);
-      ctx.globalAlpha = 0.5;
-      ctx.fillRect(0, 0, treeCellW, treeCellH);
+      cellHighlight.level === level;
+    if (highlighted) {
+      ctx.strokeStyle = colors.cellWallHighlight;
+      ctx.fillStyle = colors.cellFillHighlight;
+    } else if (expanded) {
+      ctx.strokeStyle = colors.cellWallExpanded;
+      ctx.fillStyle = colors.cellFillExpanded;
+    } else {
+      ctx.strokeStyle = colors.cellWall;
+      ctx.fillStyle = "rgba(0,0,0,0)";
     }
+    ctx.fillRect(0, 0, treeCellW, treeCellH);
+    ctx.strokeRect(0, 0, treeCellW, treeCellH);
   };
   drawTreeNode = (ctx, level) => {
     const {
@@ -241,7 +253,7 @@ class Viz extends Component {
     ctx.save();
 
     // Draw zooming cone that connects previous level to this one
-    ctx.fillStyle = "rgba(80,100,120, 0.15)";
+    ctx.fillStyle = colors.zoomCone;
     if (level > 0 && t > dipTime) {
       const ytop = scaleY(0) + treeCellH + 1;
       ctx.beginPath();
@@ -289,13 +301,13 @@ class Viz extends Component {
         ctx.stroke();
         ctx.fillText(title, x, treeRowY(-2));
       };
-      drawTick(0, "#1eb7aa", "unix epoch");
-      drawTick(+new Date() * 1e6, "#db7b35", "now");
+      drawTick(0, colors.unixEpoch, "unix epoch");
+      drawTick(+new Date() * 1e6, colors.now, "now");
     }
 
     // Draw the date ticks
     if (t === 1) {
-      ctx.strokeStyle = ctx.fillStyle = "rgba(90,110,100, 0.5)";
+      ctx.strokeStyle = ctx.fillStyle = colors.dateTick;
       const drawTick = (t, title) => {
         const x = treeTimeX[level](t);
         ctx.beginPath();
@@ -333,7 +345,7 @@ class Viz extends Component {
     const { scrubbing, path, pathAnim } = this.state;
     if (!scrubbing) return;
     ctx.save();
-    ctx.strokeStyle = "#e7e8e9";
+    ctx.strokeStyle = colors.scrub;
     ctx.translate(-30, 0);
     const barH = 32;
     const treeH = this.getTreeHeight();
@@ -419,12 +431,12 @@ class Viz extends Component {
           y += 12;
         }
       };
-      drawTick(0, "#1eb7aa", "unix\nepoch");
-      drawTick(+new Date() * 1e6, "#db7b35", "now");
+      drawTick(0, colors.unixEpoch, "unix\nepoch");
+      drawTick(+new Date() * 1e6, colors.now, "now");
     }
 
     ctx.lineWidth /= 2;
-    ctx.strokeStyle = ctx.fillStyle = "rgba(90,110,100, 0.5)";
+    ctx.strokeStyle = ctx.fillStyle = colors.dateTick;
     const drawTick = (t, title) => {
       const k = calTimeK[level](t);
       const x = calKX(k);
@@ -547,7 +559,7 @@ class Viz extends Component {
     };
 
     // draw parent
-    const gridColor = d3interpolate.interpolate("#fff", "#555")(0.3);
+    const gridColor = d3interpolate.interpolate("#fff", colors.cellWall)(0.3);
     ctx.strokeStyle = gridColor;
     ctx.save();
     transformToParent();
@@ -578,14 +590,15 @@ class Viz extends Component {
     // outline child
     ctx.save();
     transformToChild();
-    ctx.strokeStyle = d3interpolate.interpolate("rgba(0,0,0,0)", "#555")(
-      highlightT
-    );
+    ctx.strokeStyle = d3interpolate.interpolate(
+      "rgba(0,0,0,0)",
+      colors.cellWall
+    )(highlightT);
     ctx.strokeRect(0, 0, calW, calW);
     ctx.restore();
 
     // outline window
-    ctx.strokeStyle = "#555";
+    ctx.strokeStyle = colors.cellWall;
     ctx.strokeRect(0, 0, calW, calW);
 
     ctx.restore();
