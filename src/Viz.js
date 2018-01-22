@@ -604,14 +604,12 @@ class Viz extends Component {
     // TODO: compute "derived" resolution cells
   };
   scrubAnim = (x, y) => {
-    const { height, path } = this.state;
-    const pad = 40;
-    const scale = d3scale
+    const { treeY, levelOffset, treeCellH, path } = this.state;
+    const t = d3scale
       .scaleLinear()
-      .domain([pad, height - pad])
+      .domain([treeY, treeY + (path.length - 1) * levelOffset * treeCellH])
       .range([1, path.length])
-      .clamp(true);
-    const t = scale(y);
+      .clamp(true)(y);
     this.setState({ pathAnim: t });
   };
   onMouseDown = (e, { isDrag }) => {
