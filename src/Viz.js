@@ -3,7 +3,7 @@ import * as d3scale from "d3-scale";
 import { scaleTimeNano } from "./scaleTimeNano";
 import * as d3interpolate from "d3-interpolate";
 // import * as d3ease from "d3-ease";
-// import * as d3transition from "d3-transition";
+import * as d3transition from "d3-transition";
 // import * as d3shape from "d3-shape";
 
 const nodeLengthLabels = [
@@ -31,8 +31,8 @@ class Viz extends Component {
       numCells: 64, // cells in a tree row
       numSquareCells: 8, // cells in a calendar row
 
-      path: [0],
-      pathAnim: 1,
+      path: [0], // first of path is ignored for generality
+      pathAnim: 1, // float representing what index of the path we are showing
 
       // Tree placement and sizing
       treeCellW: 8,
@@ -40,6 +40,7 @@ class Viz extends Component {
       treeX: 40,
       treeY: 40,
       levelOffset: 5,
+      cellHighlight: {},
 
       // Calendar placement and sizing
       calCellSize: 38,
@@ -60,6 +61,14 @@ class Viz extends Component {
   }
   componentWillUpdate(nextProps, nextState) {
     this.computeDerivedState(nextProps, nextState);
+  }
+  componentDidMount() {
+    window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
+  }
+  componentWillUnmount() {
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
   }
   createD3Objects = () => {
     this.d3 = {};
@@ -150,13 +159,24 @@ class Viz extends Component {
     };
   };
   drawTreeCell = (ctx, level, cell) => {
-    const { treeCellH, treeCellW, path } = this.state;
+    const { treeCellH, treeCellW, path, cellHighlight } = this.state;
     const child = path[level + 1];
     ctx.globalAlpha = child === cell ? 1 : 0.1;
+    ctx.strokeStyle = "#555";
     ctx.strokeRect(0, 0, treeCellW, treeCellH);
     if (child === cell) {
-      ctx.fillStyle = "rgba(0,0,0,0.2)";
       ctx.fillStyle = "rgba(80,100,120, 0.15)";
+      ctx.fillRect(0, 0, treeCellW, treeCellH);
+    }
+    ctx.globalAlpha = 1;
+    if (
+      cellHighlight &&
+      cellHighlight.cell === cell &&
+      cellHighlight.level === level
+    ) {
+      ctx.fillStyle = ctx.strokeStyle = "#1eb7aa";
+      ctx.strokeRect(0, 0, treeCellW, treeCellH);
+      ctx.globalAlpha = 0.5;
       ctx.fillRect(0, 0, treeCellW, treeCellH);
     }
   };
@@ -240,7 +260,6 @@ class Viz extends Component {
     ctx.fillRect(0, 0, w, treeCellH);
 
     // Draw inner cells
-    ctx.strokeStyle = "#555";
     if (t === 1) {
       ctx.save();
       for (let cell = 0; cell < numCells; cell++) {
@@ -554,10 +573,34 @@ class Viz extends Component {
     this.drawCalendar(ctx);
     ctx.restore();
   };
-  onMouseMove = e => {
+  getMousePos = e => {
+    if (!e) return this.lastMouse;
     const rect = this.canvas.getBoundingClientRect();
-    // const x = e.clientX - rect.left;
+    const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    return (this.lastMouse = { x, y });
+  };
+  isLevelVisible = level => {
+    return level < Math.floor(this.state.pathAnim);
+  };
+  mouseToPath = (x, y) => {
+    const { treeX, treeY, treeCellW, treeCellH, levelOffset } = this.state;
+
+    const cell = Math.floor((x - treeX) / treeCellW);
+    const gridY = Math.floor((y - treeY) / treeCellH);
+    const level = Math.floor(gridY / levelOffset);
+    if (
+      cell >= 0 &&
+      cell < 64 &&
+      gridY % levelOffset === 0 &&
+      this.isLevelVisible(level)
+    ) {
+      return { level, cell };
+    }
+
+    // TODO: compute "derived" resolution cells
+  };
+  scrubAnim = (x, y) => {
     const { height, path } = this.state;
     const pad = 40;
     const scale = d3scale
@@ -567,6 +610,46 @@ class Viz extends Component {
       .clamp(true);
     const t = scale(y);
     this.setState({ pathAnim: t });
+  };
+  onMouseMove = e => {
+    const { x, y } = this.getMousePos(e);
+    if (this.scrubbing) {
+      this.scrubAnim(x, y);
+    } else {
+      const curr = this.mouseToPath(x, y);
+      const prev = this.state.cellHighlight;
+      this.canvas.style.cursor = curr ? "pointer" : "default";
+      if (JSON.stringify(curr) !== JSON.stringify(prev)) {
+        this.setState({ cellHighlight: curr });
+      }
+    }
+  };
+  onClick = e => {
+    const { cellHighlight } = this.state;
+    if (cellHighlight) {
+      const { level, cell } = cellHighlight;
+      // set path
+      const path = this.state.path.slice(0, level + 1);
+      path.push(cell);
+      this.setState({ path });
+      d3transition
+        .transition()
+        .duration(500)
+        .tween("expand-cell", () => t =>
+          this.setState({ pathAnim: level + 1 + t })
+        );
+    }
+  };
+  onKeyDown = e => {
+    if (e.key === "Shift") {
+      this.scrubbing = true;
+      this.onMouseMove();
+    }
+  };
+  onKeyUp = e => {
+    if (e.key === "Shift") {
+      this.scrubbing = false;
+    }
   };
   render() {
     const { width, height } = this.state;
@@ -579,8 +662,9 @@ class Viz extends Component {
         }}
         width={width * pixelRatio}
         height={height * pixelRatio}
-        style={{ width: `${width}px`, height: `${height}px` }}
+        style={{ outline: 0, width: `${width}px`, height: `${height}px` }}
         onMouseMove={this.onMouseMove}
+        onClick={this.onClick}
       />
     );
   }
