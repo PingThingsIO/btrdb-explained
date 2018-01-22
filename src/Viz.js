@@ -2,7 +2,7 @@ import React, { Component } from "react";
 import * as d3scale from "d3-scale";
 import { scaleTimeNano } from "./scaleTimeNano";
 import * as d3interpolate from "d3-interpolate";
-// import * as d3ease from "d3-ease";
+import * as d3ease from "d3-ease";
 import * as d3transition from "d3-transition";
 // import * as d3shape from "d3-shape";
 
@@ -643,9 +643,9 @@ class Viz extends Component {
         const interp = d3interpolate.interpolate(pathAnim, level + 1);
         if (this.shouldCollapseOnMouseUp) {
           d3transition
-            .transition()
+            .transition("collapse-cell")
             .duration(500)
-            .tween("collapse-cell", () => t =>
+            .tween("pathAnim", () => t =>
               this.setState({ pathAnim: interp(t) })
             )
             .on("end", () => this.setState({ path: parentPath }));
@@ -654,9 +654,9 @@ class Viz extends Component {
         parentPath.push(cell);
         this.setState({ path: parentPath });
         d3transition
-          .transition()
+          .transition("expand-cell")
           .duration(500)
-          .tween("expand-cell", () => t =>
+          .tween("pathAnim", () => t =>
             this.setState({ pathAnim: level + 1 + t })
           );
       }
@@ -687,6 +687,32 @@ class Viz extends Component {
   onKeyUp = e => {
     if (e.key === "Shift") {
       this.scrubbing = false;
+    } else if (e.key === "Enter") {
+      d3transition.interrupt("collapse-all");
+      d3transition.interrupt("expand-all");
+      d3transition.interrupt("collapse-cell");
+      d3transition.interrupt("expand-cell");
+      const { pathAnim, path } = this.state;
+      const durationPerLevel = 125;
+      if (pathAnim > 1) {
+        const interp = d3interpolate.interpolate(pathAnim, 1);
+        const dist = pathAnim - 1;
+        const duration = dist * durationPerLevel;
+        d3transition
+          .transition("collapse-all")
+          .ease(d3ease.easeLinear)
+          .duration(duration)
+          .tween("pathAnim", () => t => this.setState({ pathAnim: interp(t) }));
+      } else {
+        const interp = d3interpolate.interpolate(pathAnim, path.length);
+        const dist = path.length - pathAnim;
+        const duration = dist * durationPerLevel;
+        d3transition
+          .transition("expand-all")
+          .ease(d3ease.easeLinear)
+          .duration(duration)
+          .tween("pathAnim", () => t => this.setState({ pathAnim: interp(t) }));
+      }
     }
   };
   render() {
