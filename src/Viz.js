@@ -621,11 +621,11 @@ class Viz extends Component {
         path.push(cell);
         this.setState({ path, pathAnim: level + 2 });
       }
-      this.mousedown = true;
+      this.mousedownLevel = level;
     }
   };
   onMouseUp = e => {
-    this.mousedown = false;
+    this.mousedownLevel = null;
     const { cellHighlight } = this.state;
     if (cellHighlight) {
       const { level, cell } = cellHighlight;
@@ -653,7 +653,7 @@ class Viz extends Component {
       if (JSON.stringify(curr) !== JSON.stringify(prev)) {
         this.setState({ cellHighlight: curr });
       }
-      if (this.mousedown) {
+      if (curr && this.mousedownLevel === curr.level) {
         this.onMouseDown(e);
       }
     }
