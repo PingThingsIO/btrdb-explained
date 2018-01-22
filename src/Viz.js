@@ -31,8 +31,8 @@ const colors = {
   cellWallExpanded: "#555",
   cellWallHighlight: theme.green,
 
-  unixEpoch: theme.orange,
-  now: theme.green,
+  unixEpoch: theme.green,
+  now: theme.orange,
   dateTick: "rgba(90,110,100, 0.5)",
   scrub: "#e7e8e9",
   zoomCone: "rgba(80,100,120, 0.15)"
