@@ -1,5 +1,5 @@
 import React from "react";
-import Viz from "./Viz";
+import Tree from "./Tree";
 import logo from "./logo.svg";
 import "./Demo.css";
 
@@ -33,7 +33,7 @@ export default function() {
         </div>
       </div>
       <div className="Demo-body">
-        <Viz />
+        <Tree />
       </div>
     </div>
   );
