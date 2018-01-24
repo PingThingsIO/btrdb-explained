@@ -56,10 +56,10 @@ class Tree extends Component {
 
       // Tree placement and sizing
       treeCellW: 8,
-      treeCellH: 12,
+      treeCellH: 10,
       treeX: 40,
       treeY: 34,
-      levelOffset: 5,
+      levelOffset: 7,
       cellHighlight: null,
 
       // Calendar placement and sizing
@@ -69,6 +69,14 @@ class Tree extends Component {
 
       rootStart: -1152921504606846976,
       rootResolution: 56
+
+      // TODO:
+      // selectionStart (path)
+      // selectionEnd (path)
+
+      // TODO:
+      // path has to allow mid-level resolution cells
+      // idea: mouseToPath returns {level, numCells}
     };
     for (let i = 1; i < 10; i++) {
       this.state.path.push(Math.floor(Math.random() * this.state.numCells));
@@ -270,6 +278,22 @@ class Tree extends Component {
       ctx.fill();
     }
 
+    // draw mid-resolution blocks (temporary)
+    if (level > 0 && t === 1) {
+      for (let i = 0; i < 6; i++) {
+        ctx.save();
+        const x = this.midResStart(parent, i) * treeCellW;
+        const y = (-levelOffset + 1 + i) * treeCellH;
+        ctx.translate(x, y);
+        const numMidCells = Math.pow(2, i);
+        for (let j = 0; j < numMidCells; j++) {
+          ctx.strokeRect(0, 0, treeCellW, treeCellH);
+          ctx.translate(treeCellW, 0);
+        }
+        ctx.restore();
+      }
+    }
+
     // Translate to the topleft corner of box
     ctx.translate(x0, y);
 
@@ -405,6 +429,16 @@ class Tree extends Component {
   };
   isCellExpanded = (level, cell) => {
     return this.state.path[level + 1] === cell;
+  };
+  midResStart = (parent, exp) => {
+    // 0 <= parent < 64   (the child node of previous level that we are expanding)
+    // 0 <= exp <= 6 (the resolution row => numMidCells = 2^exp)
+    const { numCells } = this.state;
+    const numMidCells = Math.pow(2, exp);
+    return d3scale
+      .scaleLinear()
+      .domain([0, numCells - 1])
+      .range([0, numCells - numMidCells])(parent);
   };
   mouseToPath = (x, y) => {
     const { treeX, treeY, treeCellW, treeCellH, levelOffset } = this.state;
