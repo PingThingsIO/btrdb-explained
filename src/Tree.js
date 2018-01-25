@@ -269,25 +269,37 @@ class Tree extends Component {
     // Draw zooming cone that connects previous level to this one
     ctx.fillStyle = colors.zoomCone;
     if (level > 0 && t > dipTime) {
-      const ytop = scaleY(0) + treeCellH + 1;
+      ctx.save();
+      ctx.scale(treeCellW, treeCellH);
+      ctx.translate(0, -levelOffset + 1);
       ctx.beginPath();
-      ctx.moveTo(scaleX0(0), ytop);
-      ctx.lineTo(x0, y);
-      ctx.lineTo(x1, y);
-      ctx.lineTo(scaleX1(0), ytop);
+      const dy = 1 / treeCellH;
+      const maxy = d3scale
+        .scaleLinear()
+        .domain([dipTime, 1])
+        .range([0, levelOffset - 1])(t);
+      for (let y = 0; y < maxy; y += dy) {
+        const x = this.midResStart(parent, y);
+        y === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      for (let y = maxy - dy; y >= 0; y -= dy) {
+        const x = this.midResStart(parent, y) + Math.pow(2, y);
+        ctx.lineTo(x, y);
+      }
       ctx.fill();
+      ctx.restore();
     }
 
     // draw mid-resolution blocks (temporary)
     if (level > 0 && t === 1) {
-      for (let i = 0; i < 6; i++) {
+      for (let i = 1; i < 6; i++) {
         ctx.save();
         const x = this.midResStart(parent, i) * treeCellW;
         const y = (-levelOffset + 1 + i) * treeCellH;
         ctx.translate(x, y);
         const numMidCells = Math.pow(2, i);
         for (let j = 0; j < numMidCells; j++) {
-          ctx.strokeRect(0, 0, treeCellW, treeCellH);
+          // ctx.strokeRect(0, 0, treeCellW, treeCellH);
           ctx.translate(treeCellW, 0);
         }
         ctx.restore();
