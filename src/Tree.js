@@ -271,7 +271,7 @@ class Tree extends Component {
         const { x, y, numCells } = cone(r);
         ctx.translate(x, y);
         for (let i = 0; i < numCells; i++) {
-          ctx.strokeRect(0, -treeCellH / 2, treeCellW, treeCellH);
+          ctx.strokeRect(0, -treeCellH, treeCellW, treeCellH);
           ctx.translate(treeCellW, 0);
         }
         ctx.restore();
@@ -430,16 +430,24 @@ class Tree extends Component {
   mouseToPath = (x, y) => {
     const { treeX, treeY, treeCellW, treeCellH, levelOffset } = this.state;
 
+    // if mouse between two levels, always return {level,midRow}
+    // if mouse inside midRow return {level,midRow,cell}
+
     const cell = Math.floor((x - treeX) / treeCellW);
     const gridY = Math.floor((y - treeY) / treeCellH);
     const level = Math.floor(gridY / levelOffset);
-    if (
+
+    const hoverLevel =
       cell >= 0 &&
       cell < 64 &&
       gridY % levelOffset === 0 &&
-      this.isLevelVisible(level)
-    ) {
+      this.isLevelVisible(level);
+    const hoverMidLevel =
+      gridY % levelOffset > 0 && this.isLevelVisible(level + 1);
+    if (hoverLevel) {
       return { level, cell };
+    } else if (hoverMidLevel) {
+      console.log(gridY);
     }
 
     // TODO: compute "derived" resolution cells
