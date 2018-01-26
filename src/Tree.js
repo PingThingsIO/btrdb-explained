@@ -231,39 +231,6 @@ class Tree extends Component {
     // do not draw if pathAnim has not reached our level
     if (t === 0) return;
 
-    const domain = [0, dipTime, 1];
-
-    // left side
-    const scaleX0 = d3scale
-      .scaleLinear()
-      .domain(domain)
-      .range([treeColX(parent), treeColX(parent), treeColX(0)])
-      .clamp(true);
-
-    // right side
-    const scaleX1 = d3scale
-      .scaleLinear()
-      .domain(domain)
-      .range([treeColX(parent + 1), treeColX(parent + 1), treeColX(numCells)])
-      .clamp(true);
-
-    // top side
-    const scaleY = d3scale
-      .scaleLinear()
-      .domain(domain)
-      .range([
-        treeRowY(-levelOffset),
-        treeRowY(-levelOffset * (1 - dipTime)),
-        treeRowY(0)
-      ])
-      .clamp(true);
-
-    // compute
-    const x0 = scaleX0(t);
-    const x1 = scaleX1(t);
-    const y = scaleY(t);
-    const w = x1 - x0;
-
     ctx.save();
 
     // Draw zooming cone that connects previous level to this one
@@ -305,6 +272,22 @@ class Tree extends Component {
         ctx.restore();
       }
     }
+
+    // compute
+    const midT = d3scale
+      .scaleLinear()
+      .domain([dipTime, 1])
+      .range([0, 1])(t);
+    if (t > 0 && t < 1) {
+      console.log(midT);
+    }
+    const x0 =
+      t < dipTime
+        ? treeColX(parent)
+        : this.midResStart(parent, midT * 6) * treeCellW;
+    const w = t < dipTime ? treeCellW : Math.pow(2, midT * 6) * treeCellW;
+    const x1 = x0 + w;
+    const y = d3interpolate.interpolate(treeRowY(-levelOffset), treeRowY(0))(t);
 
     // Translate to the topleft corner of box
     ctx.translate(x0, y);
