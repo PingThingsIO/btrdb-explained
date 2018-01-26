@@ -233,64 +233,56 @@ class Tree extends Component {
 
     ctx.save();
 
+    const coneT = d3scale
+      .scaleLinear()
+      .domain([dipTime, 1])
+      .range([0, 1])(t);
+    const numRows = levelOffset - 1;
+    const coneRow = coneT * numRows;
+
+    const cone = row => {
+      const x = this.midResStart(parent, Math.max(0, row)) * treeCellW;
+      const numCells = Math.pow(2, Math.max(0, row));
+      const w = numCells * treeCellW;
+      const y = (-levelOffset + 1 + row) * treeCellH;
+      return { x, y, w, numCells };
+    };
+
     // Draw zooming cone that connects previous level to this one
     ctx.fillStyle = colors.zoomCone;
     if (level > 0 && t > dipTime) {
-      ctx.save();
-      ctx.scale(treeCellW, treeCellH);
-      ctx.translate(0, -levelOffset + 1);
       ctx.beginPath();
-      const dy = 1 / treeCellH;
-      const maxy = d3scale
-        .scaleLinear()
-        .domain([dipTime, 1])
-        .range([0, levelOffset - 1])(t);
-      for (let y = 0; y < maxy; y += dy) {
-        const x = this.midResStart(parent, y);
-        y === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      for (let y = maxy - dy; y >= 0; y -= dy) {
-        const x = this.midResStart(parent, y) + Math.pow(2, y);
+      const dr = 1 / treeCellH;
+      for (let r = 0; r < coneRow; r += dr) {
+        const { x, y } = cone(r);
         ctx.lineTo(x, y);
       }
+      for (let r = coneRow - dr; r >= 0; r -= dr) {
+        const { x, y, w } = cone(r);
+        ctx.lineTo(x + w, y);
+      }
       ctx.fill();
-      ctx.restore();
     }
 
     // draw mid-resolution blocks (temporary)
     if (level > 0 && t === 1) {
-      for (let i = 1; i < 6; i++) {
+      for (let r = 1; r < numRows; r++) {
         ctx.save();
-        const x = this.midResStart(parent, i) * treeCellW;
-        const y = (-levelOffset + 1 + i) * treeCellH;
+        const { x, y, numCells } = cone(r);
         ctx.translate(x, y);
-        const numMidCells = Math.pow(2, i);
-        for (let j = 0; j < numMidCells; j++) {
-          // ctx.strokeRect(0, 0, treeCellW, treeCellH);
+        for (let i = 0; i < numCells; i++) {
+          ctx.strokeRect(0, -treeCellH / 2, treeCellW, treeCellH);
           ctx.translate(treeCellW, 0);
         }
         ctx.restore();
       }
     }
 
-    // compute
-    const midT = d3scale
-      .scaleLinear()
-      .domain([dipTime, 1])
-      .range([0, 1])(t);
-    if (t > 0 && t < 1) {
-      console.log(midT);
-    }
-    const x0 =
-      t < dipTime
-        ? treeColX(parent)
-        : this.midResStart(parent, midT * 6) * treeCellW;
-    const w = t < dipTime ? treeCellW : Math.pow(2, midT * 6) * treeCellW;
-    const x1 = x0 + w;
-    const y = d3interpolate.interpolate(treeRowY(-levelOffset), treeRowY(0))(t);
+    const { x, y, w } = cone(coneRow);
+    const x1 = x + w;
 
     // Translate to the topleft corner of box
-    ctx.translate(x0, y);
+    ctx.translate(x, y);
 
     // Make opaque
     ctx.fillStyle = "#fff";
