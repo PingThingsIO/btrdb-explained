@@ -33,6 +33,11 @@ const colors = {
   cellWallExpanded: "#555",
   cellWallHighlight: theme.green,
 
+  nodeFill: "#fff",
+  nodeStroke: "#000",
+  midNodeFill: hexToRgba("#fff", 0.5),
+  midNodeStroke: hexToRgba("#000", 0.5),
+
   unixEpoch: theme.green,
   now: theme.orange,
   dateTick: "rgba(90,110,100, 0.5)",
@@ -214,8 +219,28 @@ class Tree extends Component {
     ctx.fillRect(0, 0, treeCellW, treeCellH);
     ctx.strokeRect(0, 0, treeCellW, treeCellH);
   };
+  drawTreeMidResCell = (ctx, level, cell, midRes) => {
+    const { treeCellH, treeCellW, cellHighlight } = this.state;
+    const highlight = cellHighlight.cell === cell;
+    if (highlight) {
+      ctx.strokeStyle = colors.cellWallHighlight;
+      ctx.fillStyle = colors.cellFillHighlight;
+    } else {
+      ctx.strokeStyle = colors.cellWall;
+      ctx.fillStyle = "rgba(0,0,0,0)";
+    }
+    ctx.fillRect(0, 0, treeCellW, treeCellH);
+    ctx.strokeRect(0, 0, treeCellW, treeCellH);
+  };
   drawTreeNode = (ctx, level) => {
-    const { numCells, treeCellW, treeCellH, path, pathAnim } = this.state;
+    const {
+      numCells,
+      treeCellW,
+      treeCellH,
+      path,
+      pathAnim,
+      cellHighlight
+    } = this.state;
     const { treeColX, treeRowY, treeTimeX, dipTime, numMidRows } = this.ds;
 
     // index of the parent
@@ -260,11 +285,24 @@ class Tree extends Component {
     if (level > 0 && t === 1) {
       for (let r = 1; r < numMidRows; r++) {
         ctx.save();
-        const { x, y, numCells } = this.cone(parent, r);
-        ctx.translate(x, y);
-        for (let i = 0; i < numCells; i++) {
-          ctx.strokeRect(0, -treeCellH, treeCellW, treeCellH);
-          ctx.translate(treeCellW, 0);
+        const { x, y, w, numCells } = this.cone(parent, r);
+        ctx.translate(Math.floor(x), y - treeCellH);
+        const midRes = r;
+        const show =
+          cellHighlight &&
+          cellHighlight.midRes === midRes &&
+          cellHighlight.level === level;
+        if (show) {
+          ctx.fillStyle = colors.midNodeFill;
+          ctx.fillRect(0, 0, w, treeCellH);
+          ctx.save();
+          for (let cell = 0; cell < numCells; cell++) {
+            this.drawTreeMidResCell(ctx, level, cell, midRes);
+            ctx.translate(treeCellW, 0);
+          }
+          ctx.restore();
+          ctx.strokeStyle = colors.midNodeStroke;
+          ctx.strokeRect(0, 0, w, treeCellH);
         }
         ctx.restore();
       }
@@ -277,7 +315,7 @@ class Tree extends Component {
     ctx.translate(x, y);
 
     // Make opaque
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = colors.nodeFill;
     ctx.fillRect(0, 0, w, treeCellH);
 
     // Draw inner cells
@@ -291,6 +329,7 @@ class Tree extends Component {
     }
 
     // Draw outer border
+    ctx.strokeStyle = colors.nodeStroke;
     ctx.strokeRect(0, 0, w, treeCellH);
 
     // Tick font
@@ -493,7 +532,7 @@ class Tree extends Component {
   onMouseUp = e => {
     this.mousedownLevel = null;
     const { cellHighlight, pathAnim } = this.state;
-    if (cellHighlight) {
+    if (cellHighlight && cellHighlight.midRes == null) {
       const { level, cell } = cellHighlight;
       const parentPath = this.state.path.slice(0, level + 1);
       if (this.isLevelVisible(level + 1)) {
