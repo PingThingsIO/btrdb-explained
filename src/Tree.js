@@ -33,11 +33,19 @@ const colors = {
   cellWallExpanded: "#555",
   cellWallHighlight: theme.green,
 
+  nodeFill: "#fff",
+  nodeStroke: "#000",
+  midNodeFill: hexToRgba("#fff", 0.5),
+  midNodeStroke: hexToRgba("#000", 0.5),
+
   unixEpoch: theme.green,
   now: theme.orange,
   dateTick: "rgba(90,110,100, 0.5)",
   scrub: "#e7e8e9",
-  zoomCone: "rgba(80,100,120, 0.15)"
+
+  zoomCone: "rgba(80,100,120, 0.15)",
+  highlightCone: "rgba(80,100,120, 0.2)",
+  clear: "rgba(0,0,0,0)"
 };
 
 class Tree extends Component {
@@ -56,10 +64,10 @@ class Tree extends Component {
 
       // Tree placement and sizing
       treeCellW: 8,
-      treeCellH: 12,
+      treeCellH: 10,
       treeX: 40,
       treeY: 34,
-      levelOffset: 5,
+      levelOffset: 7,
       cellHighlight: null,
 
       // Calendar placement and sizing
@@ -69,6 +77,10 @@ class Tree extends Component {
 
       rootStart: -1152921504606846976,
       rootResolution: 56
+
+      // TODO:
+      // selectionStart (path)
+      // selectionEnd (path)
     };
     for (let i = 1; i < 10; i++) {
       this.state.path.push(Math.floor(Math.random() * this.state.numCells));
@@ -163,6 +175,8 @@ class Tree extends Component {
     const calKX = k => k % calW;
     const calKRow = k => Math.floor(k / calW);
 
+    const numMidRows = levelOffset - 1;
+
     this.ds = {
       pixelRatio,
       treeW,
@@ -175,14 +189,51 @@ class Tree extends Component {
       calTimeK,
       calKX,
       calKRow,
-      dipTime
+      dipTime,
+      numMidRows
     };
   };
-  drawTreeCell = (ctx, level, cell) => {
+  cone = (parent, row) => {
+    const { treeCellW, treeCellH, levelOffset } = this.state;
+    const x = this.midResStart(parent, Math.max(0, row)) * treeCellW;
+    const numCells = Math.pow(2, Math.max(0, row));
+    const w = numCells * treeCellW;
+    const y = (-levelOffset + 1 + row) * treeCellH;
+    return { x, y, w, numCells };
+  };
+  getParent = level => {
+    // get the index of the level's parent
+    // (for example, the level below descends from index 3 of previous level)
+    //
+    // 0 1 2 3 4 5 6 7 8 9
+    //       |
+    //      /|\
+    // -------------------
+    // |                 |
+    // -------------------
+    return this.state.path[level];
+  };
+  getLevelAnimTime = level => {
+    return d3scale
+      .scaleLinear()
+      .domain([level, level + 1])
+      .range([0, 1])
+      .clamp(true)(this.state.pathAnim);
+  };
+  getConeAnimRow = level => {
+    const { dipTime, numMidRows } = this.ds;
+    const t = this.getLevelAnimTime(level);
+    return d3scale
+      .scaleLinear()
+      .domain([dipTime, 1])
+      .range([0, numMidRows])(t);
+  };
+  drawCell = (ctx, level, cell) => {
     const { treeCellH, treeCellW, cellHighlight } = this.state;
     const expanded = this.isCellExpanded(level, cell);
     const highlighted =
       cellHighlight &&
+      cellHighlight.midRes == null &&
       cellHighlight.cell === cell &&
       cellHighlight.level === level;
     if (highlighted) {
@@ -193,101 +244,164 @@ class Tree extends Component {
       ctx.fillStyle = colors.cellFillExpanded;
     } else {
       ctx.strokeStyle = colors.cellWall;
-      ctx.fillStyle = "rgba(0,0,0,0)";
+      ctx.fillStyle = colors.clear;
     }
     ctx.fillRect(0, 0, treeCellW, treeCellH);
     ctx.strokeRect(0, 0, treeCellW, treeCellH);
   };
-  drawTreeNode = (ctx, level) => {
-    const {
-      numCells,
-      treeCellW,
-      treeCellH,
-      path,
-      levelOffset,
-      pathAnim
-    } = this.state;
-    const { treeColX, treeRowY, treeTimeX, dipTime } = this.ds;
+  drawMidResCell = (ctx, level, cell, midRes) => {
+    const { treeCellH, treeCellW, cellHighlight } = this.state;
+    const highlight =
+      cellHighlight &&
+      cellHighlight.level === level &&
+      cellHighlight.midRes === midRes &&
+      cellHighlight.cell === cell;
+    if (highlight) {
+      ctx.strokeStyle = colors.cellWallHighlight;
+      ctx.fillStyle = colors.cellFillHighlight;
+    } else {
+      ctx.strokeStyle = colors.cellWall;
+      ctx.fillStyle = colors.clear;
+    }
+    ctx.fillRect(0, 0, treeCellW, treeCellH);
+    ctx.strokeRect(0, 0, treeCellW, treeCellH);
+  };
+  drawZoomCone = (ctx, level) => {
+    const row = this.getConeAnimRow(level);
+    const { treeCellH } = this.state;
+    const parent = this.getParent(level);
 
-    // index of the parent
-    // (where in the previous level our node is coming from)
-    const parent = path[level];
-
-    // `t` controls the animation of this node
-    const t = d3scale
-      .scaleLinear()
-      .domain([level, level + 1])
-      .range([0, 1])
-      .clamp(true)(pathAnim);
-
-    // do not draw if pathAnim has not reached our level
-    if (t === 0) return;
-
-    const domain = [0, dipTime, 1];
-
-    // left side
-    const scaleX0 = d3scale
-      .scaleLinear()
-      .domain(domain)
-      .range([treeColX(parent), treeColX(parent), treeColX(0)])
-      .clamp(true);
-
-    // right side
-    const scaleX1 = d3scale
-      .scaleLinear()
-      .domain(domain)
-      .range([treeColX(parent + 1), treeColX(parent + 1), treeColX(numCells)])
-      .clamp(true);
-
-    // top side
-    const scaleY = d3scale
-      .scaleLinear()
-      .domain(domain)
-      .range([
-        treeRowY(-levelOffset),
-        treeRowY(-levelOffset * (1 - dipTime)),
-        treeRowY(0)
-      ])
-      .clamp(true);
-
-    // compute
-    const x0 = scaleX0(t);
-    const x1 = scaleX1(t);
-    const y = scaleY(t);
-    const w = x1 - x0;
-
-    ctx.save();
-
-    // Draw zooming cone that connects previous level to this one
-    ctx.fillStyle = colors.zoomCone;
-    if (level > 0 && t > dipTime) {
-      const ytop = scaleY(0) + treeCellH + 1;
+    if (level > 0 && row > 0) {
       ctx.beginPath();
-      ctx.moveTo(scaleX0(0), ytop);
-      ctx.lineTo(x0, y);
-      ctx.lineTo(x1, y);
-      ctx.lineTo(scaleX1(0), ytop);
+      const dr = 1 / treeCellH;
+      for (let r = 0; r <= row; r += dr) {
+        const { x, y } = this.cone(parent, r);
+        ctx.lineTo(x, y);
+      }
+      for (let r = row; r >= 0; r -= dr) {
+        const { x, y, w } = this.cone(parent, r);
+        ctx.lineTo(x + w, y);
+      }
+      ctx.fillStyle = colors.zoomCone;
       ctx.fill();
     }
+  };
+  drawHighlightCone = (ctx, level) => {
+    const { cellHighlight, treeCellH } = this.state;
+    const t = this.getLevelAnimTime(level);
+    const row = this.getConeAnimRow(level);
+
+    const highlight =
+      t === 1 &&
+      cellHighlight &&
+      cellHighlight.cell != null &&
+      cellHighlight.midRes != null &&
+      cellHighlight.level === level;
+
+    if (highlight) {
+      ctx.beginPath();
+      const dr = 1 / treeCellH;
+      const startR = cellHighlight.midRes;
+      const startCell = cellHighlight.cell;
+      const parent = this.getParent(level);
+      const top = this.cone(parent, startR);
+      for (let r = startR; r <= row; r += dr) {
+        const { x, y, w } = this.cone(parent, r);
+        ctx.lineTo(x + w * startCell / top.numCells, y);
+      }
+      for (let r = row; r >= startR; r -= dr) {
+        const { x, y, w } = this.cone(parent, r);
+        ctx.lineTo(x + w * (startCell + 1) / top.numCells, y);
+      }
+      ctx.fillStyle = colors.cellFillHighlight;
+      ctx.fill();
+    }
+  };
+  drawMidLevelBox = (ctx, level) => {
+    const { cellHighlight, treeCellW, treeCellH } = this.state;
+    const { numMidRows } = this.ds;
+
+    const parent = this.getParent(level);
+    const t = this.getLevelAnimTime(level);
+
+    if (level > 0 && t === 1) {
+      for (let r = 1; r < numMidRows; r++) {
+        ctx.save();
+        const { x, y, w, numCells } = this.cone(parent, r);
+        ctx.translate(Math.floor(x), y - treeCellH);
+        const midRes = r;
+        const show =
+          cellHighlight &&
+          cellHighlight.midRes === midRes &&
+          cellHighlight.level === level;
+        if (show) {
+          ctx.fillStyle = colors.midNodeFill;
+          ctx.fillRect(0, 0, w, treeCellH);
+          ctx.save();
+          for (let cell = 0; cell < numCells; cell++) {
+            this.drawMidResCell(ctx, level, cell, midRes);
+            ctx.translate(treeCellW, 0);
+          }
+          ctx.restore();
+          ctx.strokeStyle = colors.midNodeStroke;
+          ctx.strokeRect(0, 0, w, treeCellH);
+        }
+        ctx.restore();
+      }
+    }
+  };
+  drawLevelBox = (ctx, level) => {
+    const { treeCellW, treeCellH, numCells, cellHighlight } = this.state;
+    const { treeColX, treeRowY, treeTimeX } = this.ds;
+
+    const t = this.getLevelAnimTime(level);
+    const row = this.getConeAnimRow(level);
+    const parent = this.getParent(level);
+    const { x, y, w } = this.cone(parent, row);
+    const x1 = x + w;
 
     // Translate to the topleft corner of box
-    ctx.translate(x0, y);
+    ctx.save();
+    ctx.translate(x, y);
 
     // Make opaque
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = colors.nodeFill;
     ctx.fillRect(0, 0, w, treeCellH);
 
     // Draw inner cells
     if (t === 1) {
       ctx.save();
       for (let cell = 0; cell < numCells; cell++) {
-        this.drawTreeCell(ctx, level, cell);
+        this.drawCell(ctx, level, cell);
         ctx.translate(treeCellW, 0);
       }
       ctx.restore();
     }
 
+    // draw mid-resolution highlight and ticks
+    if (
+      t === 1 &&
+      cellHighlight &&
+      cellHighlight.midRes != null &&
+      cellHighlight.level === level &&
+      cellHighlight.cell != null
+    ) {
+      const blockSize = numCells / Math.pow(2, cellHighlight.midRes);
+      ctx.save();
+      for (let cell = 0; cell < numCells; cell += blockSize) {
+        if (cell === cellHighlight.cell * blockSize) {
+          ctx.fillStyle = colors.cellFillHighlight;
+          ctx.fillRect(0, 0, treeCellW * blockSize, treeCellH);
+        }
+        ctx.strokeStyle = hexToRgba("#555", 0.5);
+        ctx.strokeRect(0, 0, treeCellW * blockSize, treeCellH);
+        ctx.translate(blockSize * treeCellW, 0);
+      }
+      ctx.restore();
+    }
+
     // Draw outer border
+    ctx.strokeStyle = colors.nodeStroke;
     ctx.strokeRect(0, 0, w, treeCellH);
 
     // Tick font
@@ -343,6 +457,17 @@ class Tree extends Component {
 
     ctx.restore();
   };
+  drawLevel = (ctx, level) => {
+    const t = this.getLevelAnimTime(level);
+    if (t === 0) return;
+
+    ctx.save();
+    this.drawZoomCone(ctx, level);
+    this.drawHighlightCone(ctx, level);
+    this.drawLevelBox(ctx, level);
+    this.drawMidLevelBox(ctx, level);
+    ctx.restore();
+  };
   getTreeHeight = () => {
     const { path, levelOffset, treeCellH } = this.state;
     return (path.length - 1) * levelOffset * treeCellH + treeCellH;
@@ -377,7 +502,7 @@ class Tree extends Component {
     ctx.translate(treeX, treeY);
     // this.drawScrubGuide(ctx);
     for (let level = 0; level < path.length; level++) {
-      this.drawTreeNode(ctx, level);
+      this.drawLevel(ctx, level);
       ctx.translate(0, treeCellH * levelOffset);
     }
     ctx.restore();
@@ -406,22 +531,51 @@ class Tree extends Component {
   isCellExpanded = (level, cell) => {
     return this.state.path[level + 1] === cell;
   };
+  midResStart = (parent, exp) => {
+    // 0 <= parent < 64   (the child node of previous level that we are expanding)
+    // 0 <= exp <= 6 (the resolution row => numMidCells = 2^exp)
+    const { numCells } = this.state;
+    const numMidCells = Math.pow(2, exp);
+    return d3scale
+      .scaleLinear()
+      .domain([0, numCells - 1])
+      .range([0, numCells - numMidCells])(parent);
+  };
   mouseToPath = (x, y) => {
-    const { treeX, treeY, treeCellW, treeCellH, levelOffset } = this.state;
+    const {
+      treeX,
+      treeY,
+      treeCellW,
+      treeCellH,
+      levelOffset,
+      path
+    } = this.state;
+    const { numMidRows } = this.ds;
 
-    const cell = Math.floor((x - treeX) / treeCellW);
     const gridY = Math.floor((y - treeY) / treeCellH);
-    const level = Math.floor(gridY / levelOffset);
-    if (
-      cell >= 0 &&
-      cell < 64 &&
-      gridY % levelOffset === 0 &&
-      this.isLevelVisible(level)
-    ) {
-      return { level, cell };
-    }
+    let level = Math.floor(gridY / levelOffset);
 
-    // TODO: compute "derived" resolution cells
+    const atNode = gridY % levelOffset === 0 && this.isLevelVisible(level);
+    const betweenNodes =
+      gridY % levelOffset > 0 && this.isLevelVisible(level + 1);
+    if (atNode) {
+      const cell = Math.floor((x - treeX) / treeCellW);
+      if (cell >= 0 && cell < 64) return { level, cell };
+    } else if (betweenNodes) {
+      level++;
+      const row = Math.floor(gridY % levelOffset);
+      if (row < numMidRows) {
+        const parent = path[level];
+        const cone = this.cone(parent, row);
+        const cell = Math.floor((x - treeX - cone.x) / treeCellW);
+        const midRes = row;
+        if (cell >= 0 && cell < cone.numCells) {
+          return { level, midRes, cell };
+        } else {
+          return { level, midRes };
+        }
+      }
+    }
   };
   scrubAnim = (x, y) => {
     const { treeY, path } = this.state;
@@ -434,9 +588,10 @@ class Tree extends Component {
   };
   onMouseDown = (e, { isDrag }) => {
     const { x, y } = this.getMousePos(e);
-    const cellHighlight = this.mouseToPath(x, y);
-    if (cellHighlight) {
-      const { level, cell } = cellHighlight;
+    const point = this.mouseToPath(x, y);
+
+    if (point && point.midRes == null) {
+      const { level, cell } = point;
       if (this.isLevelVisible(level + 1) && !this.isCellExpanded(level, cell)) {
         const path = this.state.path.slice(0, level + 1);
         path.push(cell);
@@ -460,7 +615,11 @@ class Tree extends Component {
   onMouseUp = e => {
     this.mousedownLevel = null;
     const { cellHighlight, pathAnim } = this.state;
-    if (cellHighlight) {
+    if (
+      cellHighlight &&
+      cellHighlight.midRes == null &&
+      this.levelClickable(cellHighlight.level)
+    ) {
       const { level, cell } = cellHighlight;
       const parentPath = this.state.path.slice(0, level + 1);
       if (this.isLevelVisible(level + 1)) {
@@ -488,6 +647,9 @@ class Tree extends Component {
       }
     }
   };
+  levelClickable = level => {
+    return level < 9;
+  };
   onMouseMove = e => {
     const { x, y } = this.getMousePos(e);
     if (this.state.scrubbing) {
@@ -495,13 +657,18 @@ class Tree extends Component {
     } else {
       const curr = this.mouseToPath(x, y);
       const prev = this.state.cellHighlight;
+      const cell = curr && curr.cell;
+      const level = curr && curr.level;
+      const midRes = curr && curr.midRes;
+      const clickable =
+        cell != null && midRes == null && this.levelClickable(level);
       this.setState({
-        cursor: curr ? "pointer" : "default"
+        cursor: clickable ? "pointer" : "default"
       });
       if (JSON.stringify(curr) !== JSON.stringify(prev)) {
         this.setState({ cellHighlight: curr });
       }
-      if (curr && this.mousedownLevel === curr.level) {
+      if (clickable && this.mousedownLevel === curr.level) {
         this.onMouseDown(e, { isDrag: true });
       }
     }
@@ -510,7 +677,7 @@ class Tree extends Component {
     if (e.key === "Shift") {
       this.setState({ scrubbing: true });
       this.setState({ cursor: "grabbing" });
-      this.onMouseMove();
+      // this.onMouseMove();
     }
   };
   onKeyUp = e => {
