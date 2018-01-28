@@ -44,7 +44,8 @@ const colors = {
   scrub: "#e7e8e9",
 
   zoomCone: "rgba(80,100,120, 0.15)",
-  highlightCone: "rgba(80,100,120, 0.2)"
+  highlightCone: "rgba(80,100,120, 0.2)",
+  clear: "rgba(0,0,0,0)"
 };
 
 class Tree extends Component {
@@ -243,20 +244,24 @@ class Tree extends Component {
       ctx.fillStyle = colors.cellFillExpanded;
     } else {
       ctx.strokeStyle = colors.cellWall;
-      ctx.fillStyle = "rgba(0,0,0,0)";
+      ctx.fillStyle = colors.clear;
     }
     ctx.fillRect(0, 0, treeCellW, treeCellH);
     ctx.strokeRect(0, 0, treeCellW, treeCellH);
   };
   drawMidResCell = (ctx, level, cell, midRes) => {
     const { treeCellH, treeCellW, cellHighlight } = this.state;
-    const highlight = cellHighlight.cell === cell;
+    const highlight =
+      cellHighlight &&
+      cellHighlight.level === level &&
+      cellHighlight.midRes === midRes &&
+      cellHighlight.cell === cell;
     if (highlight) {
       ctx.strokeStyle = colors.cellWallHighlight;
       ctx.fillStyle = colors.cellFillHighlight;
     } else {
       ctx.strokeStyle = colors.cellWall;
-      ctx.fillStyle = "rgba(0,0,0,0)";
+      ctx.fillStyle = colors.clear;
     }
     ctx.fillRect(0, 0, treeCellW, treeCellH);
     ctx.strokeRect(0, 0, treeCellW, treeCellH);
@@ -269,11 +274,11 @@ class Tree extends Component {
     if (level > 0 && row > 0) {
       ctx.beginPath();
       const dr = 1 / treeCellH;
-      for (let r = 0; r < row; r += dr) {
+      for (let r = 0; r <= row; r += dr) {
         const { x, y } = this.cone(parent, r);
         ctx.lineTo(x, y);
       }
-      for (let r = row - dr; r >= 0; r -= dr) {
+      for (let r = row; r >= 0; r -= dr) {
         const { x, y, w } = this.cone(parent, r);
         ctx.lineTo(x + w, y);
       }
@@ -300,17 +305,16 @@ class Tree extends Component {
       const startCell = cellHighlight.cell;
       const parent = this.getParent(level);
       const top = this.cone(parent, startR);
-      for (let r = startR; r < row; r += dr) {
+      for (let r = startR; r <= row; r += dr) {
         const { x, y, w } = this.cone(parent, r);
         ctx.lineTo(x + w * startCell / top.numCells, y);
       }
-      for (let r = row - dr; r >= startR; r -= dr) {
+      for (let r = row; r >= startR; r -= dr) {
         const { x, y, w } = this.cone(parent, r);
         ctx.lineTo(x + w * (startCell + 1) / top.numCells, y);
       }
-      ctx.fillStyle = ctx.strokeStyle = colors.cellFillHighlight;
+      ctx.fillStyle = colors.cellFillHighlight;
       ctx.fill();
-      ctx.stroke();
     }
   };
   drawMidLevelBox = (ctx, level) => {
@@ -374,23 +378,22 @@ class Tree extends Component {
       ctx.restore();
     }
 
+    // draw mid-resolution highlight and ticks
     if (
       t === 1 &&
       cellHighlight &&
       cellHighlight.midRes != null &&
-      cellHighlight.level === level
+      cellHighlight.level === level &&
+      cellHighlight.cell != null
     ) {
       const blockSize = numCells / Math.pow(2, cellHighlight.midRes);
       ctx.save();
       for (let cell = 0; cell < numCells; cell += blockSize) {
         if (cell === cellHighlight.cell * blockSize) {
-          ctx.strokeStyle = colors.cellWallHighlight;
           ctx.fillStyle = colors.cellFillHighlight;
-        } else {
-          ctx.strokeStyle = hexToRgba("#555", 0.5);
-          ctx.fillStyle = "rgba(0,0,0,0)";
+          ctx.fillRect(0, 0, treeCellW * blockSize, treeCellH);
         }
-        ctx.fillRect(0, 0, treeCellW * blockSize, treeCellH);
+        ctx.strokeStyle = hexToRgba("#555", 0.5);
         ctx.strokeRect(0, 0, treeCellW * blockSize, treeCellH);
         ctx.translate(blockSize * treeCellW, 0);
       }
