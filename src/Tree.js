@@ -308,33 +308,56 @@ class Tree extends Component {
         const { x, y, w } = this.cone(parent, r);
         ctx.lineTo(x + w * (startCell + 1) / top.numCells, y);
       }
-      ctx.fillStyle = ctx.strokeStyle = colors.highlightCone;
+      ctx.fillStyle = ctx.strokeStyle = colors.cellFillHighlight;
       ctx.fill();
       ctx.stroke();
     }
   };
-  drawLevel = (ctx, level) => {
-    const { numCells, treeCellW, treeCellH, path, cellHighlight } = this.state;
-    const { treeColX, treeRowY, treeTimeX, numMidRows } = this.ds;
+  drawMidLevelBox = (ctx, level) => {
+    const { cellHighlight, treeCellW, treeCellH } = this.state;
+    const { numMidRows } = this.ds;
 
-    // index of the parent
-    // (where in the previous level our node is coming from)
-    const parent = path[level];
-
-    // do not draw if pathAnim has not reached our level
+    const parent = this.getParent(level);
     const t = this.getLevelAnimTime(level);
-    if (t === 0) return;
 
-    ctx.save();
+    if (level > 0 && t === 1) {
+      for (let r = 1; r < numMidRows; r++) {
+        ctx.save();
+        const { x, y, w, numCells } = this.cone(parent, r);
+        ctx.translate(Math.floor(x), y - treeCellH);
+        const midRes = r;
+        const show =
+          cellHighlight &&
+          cellHighlight.midRes === midRes &&
+          cellHighlight.level === level;
+        if (show) {
+          ctx.fillStyle = colors.midNodeFill;
+          ctx.fillRect(0, 0, w, treeCellH);
+          ctx.save();
+          for (let cell = 0; cell < numCells; cell++) {
+            this.drawMidResCell(ctx, level, cell, midRes);
+            ctx.translate(treeCellW, 0);
+          }
+          ctx.restore();
+          ctx.strokeStyle = colors.midNodeStroke;
+          ctx.strokeRect(0, 0, w, treeCellH);
+        }
+        ctx.restore();
+      }
+    }
+  };
+  drawLevelBox = (ctx, level) => {
+    const { treeCellW, treeCellH, numCells, cellHighlight } = this.state;
+    const { treeColX, treeRowY, treeTimeX } = this.ds;
 
-    this.drawZoomCone(ctx, level);
-    this.drawHighlightCone(ctx, level);
-
+    const t = this.getLevelAnimTime(level);
     const row = this.getConeAnimRow(level);
+    const parent = this.getParent(level);
     const { x, y, w } = this.cone(parent, row);
     const x1 = x + w;
 
     // Translate to the topleft corner of box
+    ctx.save();
     ctx.translate(x, y);
 
     // Make opaque
@@ -347,6 +370,29 @@ class Tree extends Component {
       for (let cell = 0; cell < numCells; cell++) {
         this.drawCell(ctx, level, cell);
         ctx.translate(treeCellW, 0);
+      }
+      ctx.restore();
+    }
+
+    if (
+      t === 1 &&
+      cellHighlight &&
+      cellHighlight.midRes != null &&
+      cellHighlight.level === level
+    ) {
+      const blockSize = numCells / Math.pow(2, cellHighlight.midRes);
+      ctx.save();
+      for (let cell = 0; cell < numCells; cell += blockSize) {
+        if (cell === cellHighlight.cell * blockSize) {
+          ctx.strokeStyle = colors.cellWallHighlight;
+          ctx.fillStyle = colors.cellFillHighlight;
+        } else {
+          ctx.strokeStyle = hexToRgba("#555", 0.5);
+          ctx.fillStyle = "rgba(0,0,0,0)";
+        }
+        ctx.fillRect(0, 0, treeCellW * blockSize, treeCellH);
+        ctx.strokeRect(0, 0, treeCellW * blockSize, treeCellH);
+        ctx.translate(blockSize * treeCellW, 0);
       }
       ctx.restore();
     }
@@ -406,34 +452,17 @@ class Tree extends Component {
       ctx.fillText(nodeLengthLabels[level], x1 + 28, treeRowY(0.5));
     }
 
-    // draw mid-resolution blocks
-    ctx.translate(-x, -y);
-    if (level > 0 && t === 1) {
-      for (let r = 1; r < numMidRows; r++) {
-        ctx.save();
-        const { x, y, w, numCells } = this.cone(parent, r);
-        ctx.translate(Math.floor(x), y - treeCellH);
-        const midRes = r;
-        const show =
-          cellHighlight &&
-          cellHighlight.midRes === midRes &&
-          cellHighlight.level === level;
-        if (show) {
-          ctx.fillStyle = colors.midNodeFill;
-          ctx.fillRect(0, 0, w, treeCellH);
-          ctx.save();
-          for (let cell = 0; cell < numCells; cell++) {
-            this.drawMidResCell(ctx, level, cell, midRes);
-            ctx.translate(treeCellW, 0);
-          }
-          ctx.restore();
-          ctx.strokeStyle = colors.midNodeStroke;
-          ctx.strokeRect(0, 0, w, treeCellH);
-        }
-        ctx.restore();
-      }
-    }
+    ctx.restore();
+  };
+  drawLevel = (ctx, level) => {
+    const t = this.getLevelAnimTime(level);
+    if (t === 0) return;
 
+    ctx.save();
+    this.drawZoomCone(ctx, level);
+    this.drawHighlightCone(ctx, level);
+    this.drawLevelBox(ctx, level);
+    this.drawMidLevelBox(ctx, level);
     ctx.restore();
   };
   getTreeHeight = () => {
@@ -636,7 +665,7 @@ class Tree extends Component {
     if (e.key === "Shift") {
       this.setState({ scrubbing: true });
       this.setState({ cursor: "grabbing" });
-      this.onMouseMove();
+      // this.onMouseMove();
     }
   };
   onKeyUp = e => {
