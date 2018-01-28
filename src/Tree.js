@@ -615,7 +615,11 @@ class Tree extends Component {
   onMouseUp = e => {
     this.mousedownLevel = null;
     const { cellHighlight, pathAnim } = this.state;
-    if (cellHighlight && cellHighlight.midRes == null) {
+    if (
+      cellHighlight &&
+      cellHighlight.midRes == null &&
+      this.levelClickable(cellHighlight.level)
+    ) {
       const { level, cell } = cellHighlight;
       const parentPath = this.state.path.slice(0, level + 1);
       if (this.isLevelVisible(level + 1)) {
@@ -643,6 +647,9 @@ class Tree extends Component {
       }
     }
   };
+  levelClickable = level => {
+    return level < 9;
+  };
   onMouseMove = e => {
     const { x, y } = this.getMousePos(e);
     if (this.state.scrubbing) {
@@ -651,8 +658,10 @@ class Tree extends Component {
       const curr = this.mouseToPath(x, y);
       const prev = this.state.cellHighlight;
       const cell = curr && curr.cell;
+      const level = curr && curr.level;
       const midRes = curr && curr.midRes;
-      const clickable = cell != null && midRes == null;
+      const clickable =
+        cell != null && midRes == null && this.levelClickable(level);
       this.setState({
         cursor: clickable ? "pointer" : "default"
       });
