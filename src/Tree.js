@@ -28,7 +28,7 @@ const theme = {
 
 const colors = {
   cellFillExpanded: "rgba(80,100,120, 0.15)",
-  cellFillHighlight: hexToRgba(theme.green, 0.4),
+  cellFillHighlight: hexToRgba(theme.green, 0.8),
   cellWall: hexToRgba("#555", 0.1),
   cellWallExpanded: "#555",
   cellWallHighlight: theme.green,
@@ -44,7 +44,7 @@ const colors = {
   scrub: "#e7e8e9",
 
   zoomCone: "rgba(80,100,120, 0.15)",
-  highlightCone: "rgba(80,100,120, 0.2)",
+  shadowCone: hexToRgba(theme.green, 0.4),
   clear: "rgba(0,0,0,0)"
 };
 
@@ -313,7 +313,7 @@ class Tree extends Component {
         const { x, y, w } = this.cone(parent, r);
         ctx.lineTo(x + w * (startCell + 1) / top.numCells, y);
       }
-      ctx.fillStyle = colors.cellFillHighlight;
+      ctx.fillStyle = colors.shadowCone;
       ctx.fill();
     }
   };
@@ -390,7 +390,7 @@ class Tree extends Component {
       ctx.save();
       for (let cell = 0; cell < numCells; cell += blockSize) {
         if (cell === cellHighlight.cell * blockSize) {
-          ctx.fillStyle = colors.cellFillHighlight;
+          ctx.fillStyle = colors.shadowCone;
           ctx.fillRect(0, 0, treeCellW * blockSize, treeCellH);
         }
         ctx.strokeStyle = hexToRgba("#555", 0.5);
