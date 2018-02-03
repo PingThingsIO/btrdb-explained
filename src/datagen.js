@@ -37,13 +37,17 @@ function cacheLookup(cache, path) {
     if (!curr || !curr.children) return;
     curr = curr.children[i];
   }
-  if (curr) return curr.value;
+  return curr;
+}
+
+function copyStat({ min, mean, max }) {
+  return { min, mean, max };
 }
 
 function cacheWrite(cache, path, children) {
   let curr = cache;
   for (let i of path) curr = curr.children[i];
-  curr.children = children.map(value => ({ value }));
+  curr.children = children.map(copyStat);
 }
 
 function fitChildren(points, parent) {
@@ -92,7 +96,7 @@ function fitChildren(points, parent) {
   return fitPoints;
 }
 
-function computeChildren(path, cache) {
+function computeChildren(cache, path) {
   if (!path || !path.length) return;
   const points = d3array.range(64).map(i => getNoise([...path, i]));
   const parentPath = path.slice(0, -1);
@@ -102,17 +106,29 @@ function computeChildren(path, cache) {
 }
 
 // path = tree node path from root
-function getStatPoint(path, mid, cache) {
+function getStatPoint(cache, path) {
   if (!path || !path.length) return;
 
-  let point = cacheLookup(cache, path);
-  if (!point) {
-    computeChildren(path.slice(0, -1), cache);
-    point = cacheLookup(cache, path);
-  }
+  const point = cacheLookup(cache, path);
+  if (point) return point;
 
-  if (!mid) return point;
+  const parentPath = path.slice(0, -1);
+  computeChildren(cache, parentPath);
+  return cacheLookup(cache, path);
+}
 
-  computeChildren(path, cache);
-  // TODO: aggregate points inside mid then return aggregate point
+function getMidStatPoint(cache, path, { res, cell }) {
+  const point = getStatPoint(cache, path);
+  if (!point) return;
+
+  if (!point.children) computeChildren(cache, path);
+
+  const width = 64 / 2 ** res;
+  const points = point.children.slice(cell * width, (cell + 1) * width);
+
+  return {
+    min: d3array.min(points, p => p.min),
+    max: d3array.max(points, p => p.max),
+    mean: d3array.sum(points, p => p.mean) / points.length
+  };
 }
