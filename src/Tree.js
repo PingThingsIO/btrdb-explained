@@ -6,6 +6,7 @@ import * as d3ease from "d3-ease";
 import * as d3transition from "d3-transition";
 import hexToRgba from "hex-to-rgba";
 // import * as d3shape from "d3-shape";
+import "./datagen";
 
 const nodeLengthLabels = [
   "146 years",
