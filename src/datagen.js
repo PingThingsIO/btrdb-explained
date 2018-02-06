@@ -162,29 +162,24 @@ function fitChildren(points, parent) {
   return fitPoints;
 }
 
-function computeChildren(cache, parentPath) {
-  if (!parentPath) return;
-  const points = d3array.range(64).map(i => getNoise([...parentPath, i]));
-  const parent = getStatPoint(cache, parentPath);
-  const finalPoints = parent ? fitChildren(points, parent) : points;
-  cacheWrite(cache, parentPath, finalPoints);
-}
-
 // path = tree node path from root
 function getStatPoint(cache, path) {
   if (!path || !path.length) return;
 
-  const point = cacheLookup(cache, path);
-  if (point) return point;
-
-  const parentPath = path.slice(0, -1);
-  computeChildren(cache, parentPath);
-  const value = cacheLookup(cache, path);
-  return value;
+  let point = cacheLookup(cache, path);
+  if (!point || !point.children) {
+    const parentPath = path.slice(0, -1);
+    const points = d3array.range(64).map(i => getNoise([...parentPath, i]));
+    const parent = getStatPoint(cache, parentPath);
+    const fitPoints = parent ? fitChildren(points, parent) : points;
+    cacheWrite(cache, parentPath, fitPoints);
+    point = cacheLookup(cache, path);
+  }
+  return point;
 }
 
 function test() {
-  const cache = { children: [] };
+  const cache = {};
   getStatPoint(cache, [0, 1, 2]);
   console.log(cache);
 }
