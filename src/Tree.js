@@ -652,17 +652,15 @@ class Tree extends Component {
           );
       }
     }
+    this.onMouseMove();
   };
   levelClickable = level => {
     return level < 9;
   };
   cellClickable = obj => {
-    const cell = obj && obj.cell;
-    const level = obj && obj.level;
-    const midRes = obj && obj.midRes;
-    const clickable =
-      cell != null && midRes == null && this.levelClickable(level);
-    return clickable;
+    if (!obj) return false;
+    const { cell, level, midRes } = obj;
+    return cell != null && midRes == null && this.levelClickable(level);
   };
   onMouseMove = e => {
     const mouse = this.getMousePos(e);
