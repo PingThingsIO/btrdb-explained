@@ -2,6 +2,8 @@ import FastSimplexNoise from "fast-simplex-noise";
 import seedrandom from "seedrandom";
 import * as d3array from "d3-array";
 
+const globalCache = {};
+
 // 10 levels of noise
 // TODO: create
 // reference: https://beta.observablehq.com/@shaunlebron/btrdb-mock-data-generator/2
@@ -115,6 +117,13 @@ function cacheWrite(cache, path, children) {
   curr.midResChildren = d3array
     .range(6)
     .map(res => midResChildren(children, res));
+
+  // special case: store stats in top-level node
+  if (path.length === 0) {
+    curr.mean = d3array.sum(children, p => p.mean) / children.length;
+    curr.min = d3array.min(children, p => p.min);
+    curr.max = d3array.max(children, p => p.max);
+  }
 }
 
 function fitChildren(points, parent) {
@@ -164,26 +173,28 @@ function fitChildren(points, parent) {
 }
 
 // path = tree node path from root
-function getStatPoint(cache, path) {
-  if (!path || !path.length) return;
+function getStatPoint(path, cache) {
+  if (!cache) cache = globalCache;
+  if (!path) return;
+  if (path.length === 0) return cache;
 
   let point = cacheLookup(cache, path);
   if (!point || !point.children) {
     const parentPath = path.slice(0, -1);
     const points = d3array.range(64).map(i => getNoise([...parentPath, i]));
-    const parent = getStatPoint(cache, parentPath);
-    const fitPoints = parent ? fitChildren(points, parent) : points;
+    const parent = getStatPoint(parentPath, cache);
+    const fitPoints = parent === cache ? points : fitChildren(points, parent);
     cacheWrite(cache, parentPath, fitPoints);
     point = cacheLookup(cache, path);
   }
   return point;
 }
 
-function test() {
-  const cache = {};
-  getStatPoint(cache, [0, 1, 2]);
-  console.log(cache);
+// initialize cache
+function initCache(cache) {
+  getStatPoint([0], cache);
 }
-test();
 
-export { getStatPoint };
+initCache(globalCache);
+
+export { getStatPoint, initCache };

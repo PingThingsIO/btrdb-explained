@@ -4,9 +4,10 @@ import { scaleTimeNano } from "./scaleTimeNano";
 import * as d3interpolate from "d3-interpolate";
 import * as d3ease from "d3-ease";
 import * as d3transition from "d3-transition";
+import * as d3array from "d3-array";
 import hexToRgba from "hex-to-rgba";
 // import * as d3shape from "d3-shape";
-import "./datagen";
+import { getStatPoint } from "./datagen";
 
 const nodeLengthLabels = [
   "146 years",
@@ -71,6 +72,11 @@ class Tree extends Component {
       levelOffset: 7,
       cellHighlight: null,
 
+      // Plot placement and sizing
+      plotX: 640,
+      plotW: 256,
+      plotH: 40,
+
       // Calendar placement and sizing
       calCellSize: 38,
       calX: 700,
@@ -116,7 +122,8 @@ class Tree extends Component {
       rootResolution,
       numCells,
       numSquareCells,
-      levelOffset
+      levelOffset,
+      plotH
     } = state;
 
     // `dip` is how long `t` will spend dropping the node before expanding it.
@@ -178,6 +185,23 @@ class Tree extends Component {
 
     const numMidRows = levelOffset - 1;
 
+    // pre-populate tree data by retrieving bottom point
+    const bottomPath = path.slice(1); // remove the stand-in root node
+    bottomPath.push(0); // retrieve any node on last path
+    getStatPoint(bottomPath);
+
+    // get node for each level (cell data inside `.children` property)
+    const levelPaths = d3array
+      .range(path.length)
+      .map(i => path.slice(1, i + 1));
+    const levelData = levelPaths.map(path => getStatPoint(path));
+    const levelScaleY = levelData.map(({ min, max }) =>
+      d3scale
+        .scaleLinear()
+        .domain([min, max])
+        .range([plotH, 0])
+    );
+
     this.ds = {
       pixelRatio,
       treeW,
@@ -191,7 +215,9 @@ class Tree extends Component {
       calKX,
       calKRow,
       dipTime,
-      numMidRows
+      numMidRows,
+      levelData,
+      levelScaleY
     };
   };
   cone = (parent, row) => {
@@ -458,6 +484,34 @@ class Tree extends Component {
 
     ctx.restore();
   };
+  drawPlot = (ctx, level) => {
+    const t = this.getLevelAnimTime(level);
+    if (t < 1) return;
+
+    const { plotX, plotW, plotH, treeCellH } = this.state;
+    const { levelData, levelScaleY } = this.ds;
+
+    // TODO: use midResChildren if highlighting midRes level
+    const points = levelData[level].children;
+    if (!points) return;
+    const xScale = d3scale
+      .scaleLinear()
+      .domain([0, points.length - 1])
+      .range([0, plotW]);
+    const yScale = levelScaleY[level];
+
+    ctx.save();
+    ctx.translate(plotX, treeCellH / 2 - plotH / 2);
+    ctx.beginPath();
+    points.forEach(({ mean }, i) => {
+      const x = xScale(i);
+      const y = yScale(mean);
+      ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    // TODO: draw from this.ds.levelData
+    ctx.restore();
+  };
   drawLevel = (ctx, level) => {
     const t = this.getLevelAnimTime(level);
     if (t === 0) return;
@@ -467,6 +521,7 @@ class Tree extends Component {
     this.drawHighlightCone(ctx, level);
     this.drawLevelBox(ctx, level);
     this.drawMidLevelBox(ctx, level);
+    this.drawPlot(ctx, level);
     ctx.restore();
   };
   getTreeHeight = () => {
