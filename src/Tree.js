@@ -474,8 +474,8 @@ class Tree extends Component {
     return (path.length - 1) * levelOffset * treeCellH + treeCellH;
   };
   drawScrubGuide = ctx => {
-    const { scrubbing, path, pathAnim } = this.state;
-    if (!scrubbing) return;
+    const { scrubbingAnim, path, pathAnim } = this.state;
+    if (!scrubbingAnim) return;
     ctx.save();
     ctx.strokeStyle = colors.scrub;
     ctx.translate(-30, 0);
@@ -559,6 +559,7 @@ class Tree extends Component {
     const atNode = gridY % levelOffset === 0 && this.isLevelVisible(level);
     const betweenNodes =
       gridY % levelOffset > 0 && this.isLevelVisible(level + 1);
+
     if (atNode) {
       const cell = Math.floor((x - treeX) / treeCellW);
       if (cell >= 0 && cell < 64) return { level, cell };
@@ -588,7 +589,11 @@ class Tree extends Component {
     this.setState({ pathAnim: t });
   };
   onMouseDown = (e, { isDrag }) => {
-    const { x, y } = this.getMousePos(e);
+    const mouse = this.getMousePos(e);
+    if (!this.isMouseDown) this.mouseLockY = mouse.y;
+    this.isMouseDown = true;
+
+    const { x, y } = { x: mouse.x, y: this.mouseLockY };
     const point = this.mouseToPath(x, y);
 
     if (point && point.midRes == null) {
@@ -598,7 +603,6 @@ class Tree extends Component {
         path.push(cell);
         this.setState({ path, pathAnim: level + 2 });
       }
-      this.mousedownLevel = level;
       if (!isDrag) {
         this.mousedownCell = cell;
         this.shouldCollapseOnMouseUp = this.isCellExpanded(level, cell);
@@ -614,7 +618,8 @@ class Tree extends Component {
     d3transition.interrupt("expand-all");
   };
   onMouseUp = e => {
-    this.mousedownLevel = null;
+    this.isMouseDown = false;
+    this.mouseLockY = null;
     const { cellHighlight, pathAnim } = this.state;
     if (
       cellHighlight &&
@@ -651,39 +656,42 @@ class Tree extends Component {
   levelClickable = level => {
     return level < 9;
   };
+  cellClickable = obj => {
+    const cell = obj && obj.cell;
+    const level = obj && obj.level;
+    const midRes = obj && obj.midRes;
+    const clickable =
+      cell != null && midRes == null && this.levelClickable(level);
+    return clickable;
+  };
   onMouseMove = e => {
-    const { x, y } = this.getMousePos(e);
-    if (this.state.scrubbing) {
-      this.scrubAnim(x, y);
+    const mouse = this.getMousePos(e);
+    if (this.state.scrubbingAnim) {
+      this.scrubAnim(mouse.x, mouse.y);
     } else {
+      const x = mouse.x;
+      const y = this.isMouseDown ? this.mouseLockY : mouse.y;
       const curr = this.mouseToPath(x, y);
       const prev = this.state.cellHighlight;
-      const cell = curr && curr.cell;
-      const level = curr && curr.level;
-      const midRes = curr && curr.midRes;
-      const clickable =
-        cell != null && midRes == null && this.levelClickable(level);
-      this.setState({
-        cursor: clickable ? "pointer" : "default"
-      });
-      if (JSON.stringify(curr) !== JSON.stringify(prev)) {
-        this.setState({ cellHighlight: curr });
-      }
-      if (clickable && this.mousedownLevel === curr.level) {
-        this.onMouseDown(e, { isDrag: true });
-      }
+      const clickable = this.cellClickable(curr);
+      const cursor = clickable ? "pointer" : "default";
+      const cursorChange = this.state.cursor !== cursor;
+      const highlightChange = JSON.stringify(curr) !== JSON.stringify(prev);
+      if (cursorChange) this.setState({ cursor });
+      if (highlightChange) this.setState({ cellHighlight: curr });
+      if (this.isMouseDown) this.onMouseDown(e, { isDrag: true });
     }
   };
   onKeyDown = e => {
     if (e.key === "Shift") {
-      this.setState({ scrubbing: true });
+      this.setState({ scrubbingAnim: true });
       this.setState({ cursor: "grabbing" });
       // this.onMouseMove();
     }
   };
   onKeyUp = e => {
     if (e.key === "Shift") {
-      this.setState({ scrubbing: false });
+      this.setState({ scrubbingAnim: false });
       this.setState({ cursor: "default" });
     } else if (e.key === "Enter") {
       this.cancelTransitions();

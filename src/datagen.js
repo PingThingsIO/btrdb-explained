@@ -94,6 +94,7 @@ function copyStat({ min, mean, max }) {
 }
 
 function midResChildren(children, res) {
+  if (!res) return;
   const numPoints = 2 ** res;
   const width = 64 / numPoints;
   const midResPoint = i => {
