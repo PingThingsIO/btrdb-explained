@@ -4,8 +4,10 @@ import { scaleTimeNano } from "./scaleTimeNano";
 import * as d3interpolate from "d3-interpolate";
 import * as d3ease from "d3-ease";
 import * as d3transition from "d3-transition";
-import hexToRgba from "hex-to-rgba";
-// import * as d3shape from "d3-shape";
+import * as d3array from "d3-array";
+import * as d3color from "d3-color";
+import * as d3shape from "d3-shape";
+import { getStatPoint } from "./datagen";
 
 const nodeLengthLabels = [
   "146 years",
@@ -21,6 +23,12 @@ const nodeLengthLabels = [
   "4 ns"
 ];
 
+function rgba(color, opacity) {
+  const c = d3color.color(color);
+  c.opacity = opacity;
+  return c + "";
+}
+
 const theme = {
   green: "#1eb7aa",
   orange: "#db7b35"
@@ -28,15 +36,15 @@ const theme = {
 
 const colors = {
   cellFillExpanded: "rgba(80,100,120, 0.15)",
-  cellFillHighlight: hexToRgba(theme.green, 0.4),
-  cellWall: hexToRgba("#555", 0.1),
+  cellFillHighlight: rgba(theme.green, 0.8),
+  cellWall: rgba("#555", 0.1),
   cellWallExpanded: "#555",
   cellWallHighlight: theme.green,
 
   nodeFill: "#fff",
   nodeStroke: "#000",
-  midNodeFill: hexToRgba("#fff", 0.5),
-  midNodeStroke: hexToRgba("#000", 0.5),
+  midNodeFill: rgba("#fff", 0.5),
+  midNodeStroke: rgba("#000", 0.5),
 
   unixEpoch: theme.green,
   now: theme.orange,
@@ -44,7 +52,12 @@ const colors = {
   scrub: "#e7e8e9",
 
   zoomCone: "rgba(80,100,120, 0.15)",
-  highlightCone: "rgba(80,100,120, 0.2)",
+  shadowCone: rgba(theme.green, 0.4),
+
+  plotShadow: "rgba(80,100,120, 0.15)",
+  plotLine: rgba("#555", 0.5),
+  plotBorder: "#555",
+  plotHighlight: theme.green,
   clear: "rgba(0,0,0,0)"
 };
 
@@ -69,6 +82,11 @@ class Tree extends Component {
       treeY: 34,
       levelOffset: 7,
       cellHighlight: null,
+
+      // Plot placement and sizing
+      plotX: 620,
+      plotW: 256,
+      plotH: 40,
 
       // Calendar placement and sizing
       calCellSize: 38,
@@ -115,7 +133,8 @@ class Tree extends Component {
       rootResolution,
       numCells,
       numSquareCells,
-      levelOffset
+      levelOffset,
+      plotH
     } = state;
 
     // `dip` is how long `t` will spend dropping the node before expanding it.
@@ -177,6 +196,23 @@ class Tree extends Component {
 
     const numMidRows = levelOffset - 1;
 
+    // pre-populate tree data by retrieving bottom point
+    const bottomPath = path.slice(1); // remove the stand-in root node
+    bottomPath.push(0); // retrieve any node on last path
+    getStatPoint(bottomPath);
+
+    // get node for each level (cell data inside `.children` property)
+    const levelPaths = d3array
+      .range(path.length)
+      .map(i => path.slice(1, i + 1));
+    const levelData = levelPaths.map(path => getStatPoint(path));
+    const levelScaleY = levelData.map(({ min, max }) =>
+      d3scale
+        .scaleLinear()
+        .domain([min, max])
+        .range([plotH, 0])
+    );
+
     this.ds = {
       pixelRatio,
       treeW,
@@ -190,7 +226,9 @@ class Tree extends Component {
       calKX,
       calKRow,
       dipTime,
-      numMidRows
+      numMidRows,
+      levelData,
+      levelScaleY
     };
   };
   cone = (parent, row) => {
@@ -313,7 +351,7 @@ class Tree extends Component {
         const { x, y, w } = this.cone(parent, r);
         ctx.lineTo(x + w * (startCell + 1) / top.numCells, y);
       }
-      ctx.fillStyle = colors.cellFillHighlight;
+      ctx.fillStyle = colors.shadowCone;
       ctx.fill();
     }
   };
@@ -390,10 +428,10 @@ class Tree extends Component {
       ctx.save();
       for (let cell = 0; cell < numCells; cell += blockSize) {
         if (cell === cellHighlight.cell * blockSize) {
-          ctx.fillStyle = colors.cellFillHighlight;
+          ctx.fillStyle = colors.shadowCone;
           ctx.fillRect(0, 0, treeCellW * blockSize, treeCellH);
         }
-        ctx.strokeStyle = hexToRgba("#555", 0.5);
+        ctx.strokeStyle = rgba("#555", 0.5);
         ctx.strokeRect(0, 0, treeCellW * blockSize, treeCellH);
         ctx.translate(blockSize * treeCellW, 0);
       }
@@ -457,6 +495,64 @@ class Tree extends Component {
 
     ctx.restore();
   };
+  drawPlot = (ctx, level) => {
+    const t = this.getLevelAnimTime(level);
+    if (t < 1) return;
+
+    const { plotX, plotW, plotH, treeCellH } = this.state;
+    const { levelData, levelScaleY } = this.ds;
+
+    // TODO: use midResChildren if highlighting midRes level
+    const points = levelData[level].children.map(({ min, mean, max }, i) => ({
+      min,
+      mean,
+      max,
+      i
+    }));
+
+    if (!points) return;
+
+    // scales
+    const xScale = d3scale
+      .scaleLinear()
+      .domain([0, points.length - 1])
+      .range([0, plotW]);
+    const yScale = levelScaleY[level];
+
+    // shapes
+    const line = d3shape
+      .line()
+      .context(ctx)
+      .x(({ i }) => xScale(i))
+      .y(({ mean }) => yScale(mean));
+    const shadow = d3shape
+      .area()
+      .context(ctx)
+      .x(({ i }) => xScale(i))
+      .y0(({ min }) => yScale(min))
+      .y1(({ max }) => yScale(max));
+
+    ctx.save();
+    ctx.translate(plotX, treeCellH / 2 - plotH / 2);
+
+    // draw border
+    ctx.strokeStyle = colors.plotBorder;
+    ctx.strokeRect(0, 0, plotW, plotH);
+
+    // draw min/max shadow
+    ctx.beginPath();
+    shadow(points);
+    ctx.fillStyle = colors.plotShadow;
+    ctx.fill();
+
+    // draw mean
+    ctx.beginPath();
+    line(points);
+    ctx.strokeStyle = colors.plotLine;
+    ctx.stroke();
+
+    ctx.restore();
+  };
   drawLevel = (ctx, level) => {
     const t = this.getLevelAnimTime(level);
     if (t === 0) return;
@@ -466,6 +562,7 @@ class Tree extends Component {
     this.drawHighlightCone(ctx, level);
     this.drawLevelBox(ctx, level);
     this.drawMidLevelBox(ctx, level);
+    this.drawPlot(ctx, level);
     ctx.restore();
   };
   getTreeHeight = () => {
@@ -473,8 +570,8 @@ class Tree extends Component {
     return (path.length - 1) * levelOffset * treeCellH + treeCellH;
   };
   drawScrubGuide = ctx => {
-    const { scrubbing, path, pathAnim } = this.state;
-    if (!scrubbing) return;
+    const { scrubbingAnim, path, pathAnim } = this.state;
+    if (!scrubbingAnim) return;
     ctx.save();
     ctx.strokeStyle = colors.scrub;
     ctx.translate(-30, 0);
@@ -558,6 +655,7 @@ class Tree extends Component {
     const atNode = gridY % levelOffset === 0 && this.isLevelVisible(level);
     const betweenNodes =
       gridY % levelOffset > 0 && this.isLevelVisible(level + 1);
+
     if (atNode) {
       const cell = Math.floor((x - treeX) / treeCellW);
       if (cell >= 0 && cell < 64) return { level, cell };
@@ -587,7 +685,11 @@ class Tree extends Component {
     this.setState({ pathAnim: t });
   };
   onMouseDown = (e, { isDrag }) => {
-    const { x, y } = this.getMousePos(e);
+    const mouse = this.getMousePos(e);
+    if (!this.isMouseDown) this.mouseLockY = mouse.y;
+    this.isMouseDown = true;
+
+    const { x, y } = { x: mouse.x, y: this.mouseLockY };
     const point = this.mouseToPath(x, y);
 
     if (point && point.midRes == null) {
@@ -597,7 +699,6 @@ class Tree extends Component {
         path.push(cell);
         this.setState({ path, pathAnim: level + 2 });
       }
-      this.mousedownLevel = level;
       if (!isDrag) {
         this.mousedownCell = cell;
         this.shouldCollapseOnMouseUp = this.isCellExpanded(level, cell);
@@ -613,7 +714,8 @@ class Tree extends Component {
     d3transition.interrupt("expand-all");
   };
   onMouseUp = e => {
-    this.mousedownLevel = null;
+    this.isMouseDown = false;
+    this.mouseLockY = null;
     const { cellHighlight, pathAnim } = this.state;
     if (
       cellHighlight &&
@@ -646,43 +748,44 @@ class Tree extends Component {
           );
       }
     }
+    this.onMouseMove();
   };
   levelClickable = level => {
     return level < 9;
   };
+  cellClickable = obj => {
+    if (!obj) return false;
+    const { cell, level, midRes } = obj;
+    return cell != null && midRes == null && this.levelClickable(level);
+  };
   onMouseMove = e => {
-    const { x, y } = this.getMousePos(e);
-    if (this.state.scrubbing) {
-      this.scrubAnim(x, y);
+    const mouse = this.getMousePos(e);
+    if (this.state.scrubbingAnim) {
+      this.scrubAnim(mouse.x, mouse.y);
     } else {
+      const x = mouse.x;
+      const y = this.isMouseDown ? this.mouseLockY : mouse.y;
       const curr = this.mouseToPath(x, y);
       const prev = this.state.cellHighlight;
-      const cell = curr && curr.cell;
-      const level = curr && curr.level;
-      const midRes = curr && curr.midRes;
-      const clickable =
-        cell != null && midRes == null && this.levelClickable(level);
-      this.setState({
-        cursor: clickable ? "pointer" : "default"
-      });
-      if (JSON.stringify(curr) !== JSON.stringify(prev)) {
-        this.setState({ cellHighlight: curr });
-      }
-      if (clickable && this.mousedownLevel === curr.level) {
-        this.onMouseDown(e, { isDrag: true });
-      }
+      const clickable = this.cellClickable(curr);
+      const cursor = clickable ? "pointer" : "default";
+      const cursorChange = this.state.cursor !== cursor;
+      const highlightChange = JSON.stringify(curr) !== JSON.stringify(prev);
+      if (cursorChange) this.setState({ cursor });
+      if (highlightChange) this.setState({ cellHighlight: curr });
+      if (this.isMouseDown) this.onMouseDown(e, { isDrag: true });
     }
   };
   onKeyDown = e => {
     if (e.key === "Shift") {
-      this.setState({ scrubbing: true });
+      this.setState({ scrubbingAnim: true });
       this.setState({ cursor: "grabbing" });
       // this.onMouseMove();
     }
   };
   onKeyUp = e => {
     if (e.key === "Shift") {
-      this.setState({ scrubbing: false });
+      this.setState({ scrubbingAnim: false });
       this.setState({ cursor: "default" });
     } else if (e.key === "Enter") {
       this.cancelTransitions();
