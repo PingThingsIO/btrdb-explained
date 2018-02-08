@@ -6,7 +6,7 @@ import * as d3ease from "d3-ease";
 import * as d3transition from "d3-transition";
 import * as d3array from "d3-array";
 import hexToRgba from "hex-to-rgba";
-// import * as d3shape from "d3-shape";
+import * as d3shape from "d3-shape";
 import { getStatPoint } from "./datagen";
 
 const nodeLengthLabels = [
@@ -47,6 +47,11 @@ const colors = {
 
   zoomCone: "rgba(80,100,120, 0.15)",
   shadowCone: hexToRgba(theme.green, 0.4),
+
+  plotShadow: "rgba(80,100,120, 0.15)",
+  plotLine: hexToRgba("#555", 0.5),
+  plotBorder: "#555",
+  plotHighlight: theme.green,
   clear: "rgba(0,0,0,0)"
 };
 
@@ -73,7 +78,7 @@ class Tree extends Component {
       cellHighlight: null,
 
       // Plot placement and sizing
-      plotX: 640,
+      plotX: 620,
       plotW: 256,
       plotH: 40,
 
@@ -492,24 +497,54 @@ class Tree extends Component {
     const { levelData, levelScaleY } = this.ds;
 
     // TODO: use midResChildren if highlighting midRes level
-    const points = levelData[level].children;
+    const points = levelData[level].children.map(({ min, mean, max }, i) => ({
+      min,
+      mean,
+      max,
+      i
+    }));
+
     if (!points) return;
+
+    // scales
     const xScale = d3scale
       .scaleLinear()
       .domain([0, points.length - 1])
       .range([0, plotW]);
     const yScale = levelScaleY[level];
 
+    // shapes
+    const line = d3shape
+      .line()
+      .context(ctx)
+      .x(({ i }) => xScale(i))
+      .y(({ mean }) => yScale(mean));
+    const shadow = d3shape
+      .area()
+      .context(ctx)
+      .x(({ i }) => xScale(i))
+      .y0(({ min }) => yScale(min))
+      .y1(({ max }) => yScale(max));
+
     ctx.save();
     ctx.translate(plotX, treeCellH / 2 - plotH / 2);
+
+    // draw border
+    ctx.fillStyle = colors.plotBorder;
+    ctx.strokeRect(0, 0, plotW, plotH);
+
+    // draw min/max shadow
     ctx.beginPath();
-    points.forEach(({ mean }, i) => {
-      const x = xScale(i);
-      const y = yScale(mean);
-      ctx.lineTo(x, y);
-    });
+    shadow(points);
+    ctx.fillStyle = colors.plotShadow;
+    ctx.fill();
+
+    // draw mean
+    ctx.beginPath();
+    line(points);
+    ctx.strokeStyle = colors.plotLine;
     ctx.stroke();
-    // TODO: draw from this.ds.levelData
+
     ctx.restore();
   };
   drawLevel = (ctx, level) => {
