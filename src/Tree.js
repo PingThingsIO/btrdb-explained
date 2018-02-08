@@ -5,7 +5,7 @@ import * as d3interpolate from "d3-interpolate";
 import * as d3ease from "d3-ease";
 import * as d3transition from "d3-transition";
 import * as d3array from "d3-array";
-import hexToRgba from "hex-to-rgba";
+import * as d3color from "d3-color";
 import * as d3shape from "d3-shape";
 import { getStatPoint } from "./datagen";
 
@@ -23,6 +23,12 @@ const nodeLengthLabels = [
   "4 ns"
 ];
 
+function rgba(color, opacity) {
+  const c = d3color.color(color);
+  c.opacity = opacity;
+  return c + "";
+}
+
 const theme = {
   green: "#1eb7aa",
   orange: "#db7b35"
@@ -30,15 +36,15 @@ const theme = {
 
 const colors = {
   cellFillExpanded: "rgba(80,100,120, 0.15)",
-  cellFillHighlight: hexToRgba(theme.green, 0.8),
-  cellWall: hexToRgba("#555", 0.1),
+  cellFillHighlight: rgba(theme.green, 0.8),
+  cellWall: rgba("#555", 0.1),
   cellWallExpanded: "#555",
   cellWallHighlight: theme.green,
 
   nodeFill: "#fff",
   nodeStroke: "#000",
-  midNodeFill: hexToRgba("#fff", 0.5),
-  midNodeStroke: hexToRgba("#000", 0.5),
+  midNodeFill: rgba("#fff", 0.5),
+  midNodeStroke: rgba("#000", 0.5),
 
   unixEpoch: theme.green,
   now: theme.orange,
@@ -46,10 +52,10 @@ const colors = {
   scrub: "#e7e8e9",
 
   zoomCone: "rgba(80,100,120, 0.15)",
-  shadowCone: hexToRgba(theme.green, 0.4),
+  shadowCone: rgba(theme.green, 0.4),
 
   plotShadow: "rgba(80,100,120, 0.15)",
-  plotLine: hexToRgba("#555", 0.5),
+  plotLine: rgba("#555", 0.5),
   plotBorder: "#555",
   plotHighlight: theme.green,
   clear: "rgba(0,0,0,0)"
@@ -425,7 +431,7 @@ class Tree extends Component {
           ctx.fillStyle = colors.shadowCone;
           ctx.fillRect(0, 0, treeCellW * blockSize, treeCellH);
         }
-        ctx.strokeStyle = hexToRgba("#555", 0.5);
+        ctx.strokeStyle = rgba("#555", 0.5);
         ctx.strokeRect(0, 0, treeCellW * blockSize, treeCellH);
         ctx.translate(blockSize * treeCellW, 0);
       }
@@ -530,7 +536,7 @@ class Tree extends Component {
     ctx.translate(plotX, treeCellH / 2 - plotH / 2);
 
     // draw border
-    ctx.fillStyle = colors.plotBorder;
+    ctx.strokeStyle = colors.plotBorder;
     ctx.strokeRect(0, 0, plotW, plotH);
 
     // draw min/max shadow

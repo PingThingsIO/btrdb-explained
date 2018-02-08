@@ -12,14 +12,15 @@ const globalCache = {};
 // prettier-ignore
 const levelNoiseKnobs = [
   {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
-  {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
-  {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
-  {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
-  {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
-  {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
-  {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
-  {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
-  {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
+  {meanFrequency: 0.111, shadowFrequency: 0.05, octaves: 2, persistence: 0.5, meanHeight: 43, shadowHeight: 57},
+  {meanFrequency: 0.24, shadowFrequency: 0.049, octaves: 4, persistence: 0.5, meanHeight: 28, shadowHeight: 19},
+  {meanFrequency: 0.078, shadowFrequency: 0.049, octaves: 5, persistence: 0.5, meanHeight: 72, shadowHeight: 39},
+  {meanFrequency: 0.363, shadowFrequency: 0.042, octaves: 1, persistence: 0.5, meanHeight: 72, shadowHeight: 74},
+  {meanFrequency: 0.095, shadowFrequency: 0.05, octaves: 3, persistence: 0.5, meanHeight: 140, shadowHeight: 74},
+  {meanFrequency: 0.053, shadowFrequency: 0.026, octaves: 2, persistence: 0.5, meanHeight: 140, shadowHeight: 87},
+  {meanFrequency: 0.029, shadowFrequency: 0.021, octaves: 3, persistence: 0.5, meanHeight: 90, shadowHeight: 46},
+  {meanFrequency: 0.021, shadowFrequency: 0.016, octaves: 2, persistence: 0.5, meanHeight: 70, shadowHeight: 46},
+
   {meanFrequency: 0.03, shadowFrequency: 0.05, octaves: 5, persistence: 0.5, meanHeight: 120, shadowHeight: 40},
 ];
 
@@ -57,23 +58,23 @@ for (let {
 }
 
 // global noise knobs
-const meanNoiseTime = 0;
+const meanNoiseTime = 32;
 const minNoiseTime = 50;
 const maxNoiseTime = 80;
 
 function getNoiseXFromPath(path) {
-  let exp = 40; // some large exponent (maybe not the full 56 since too large for floats)
+  let exp = 0;
   let x = 0;
-  for (let p of path) {
-    x += p * 2 ** exp;
-    exp -= 6;
+  for (let i = path.length - 1; i >= 0; i--) {
+    x += path[i] * 2 ** exp;
+    exp += 6;
   }
   return x;
 }
 
 function getNoise(path) {
   const level = path.length - 1;
-  const x = getNoiseXFromPath(path);
+  const x = path.length === 1 ? path[0] : getNoiseXFromPath(path);
   const mean = meanNoise[level].scaled([x, meanNoiseTime]);
   const min = mean - shadowNoise[level].scaled([x, minNoiseTime]);
   const max = mean + shadowNoise[level].scaled([x, maxNoiseTime]);
