@@ -1,3 +1,12 @@
+## v2018.02.08
+
+[screenshot][screenshot-2018-02-08] | [demo permalink][demo-2018-02-08]
+
+- Populate tree with Simplex Noise and plot
+
+[screenshot-2018-02-08]:https://user-images.githubusercontent.com/116838/35985837-2b30fb54-0cbd-11e8-86f7-705ced580456.gif
+[demo-2018-02-08]:http://btrdb-viz-2018-02-08.surge.sh
+
 ## v2018.01.28
 
 [screenshot][screenshot-2018-01-28] | [demo permalink][demo-2018-01-28]
