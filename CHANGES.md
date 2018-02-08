@@ -2,7 +2,7 @@
 
 [screenshot][screenshot-2018-02-08] | [demo permalink][demo-2018-02-08]
 
-- Populate tree with Simplex Noise and plot
+- Populate tree with Simplex Noise and plot (See [#7](https://github.com/PingThingsIO/btrdb-explained/pull/7))
 
 [screenshot-2018-02-08]:https://user-images.githubusercontent.com/116838/35985837-2b30fb54-0cbd-11e8-86f7-705ced580456.gif
 [demo-2018-02-08]:http://btrdb-viz-2018-02-08.surge.sh
