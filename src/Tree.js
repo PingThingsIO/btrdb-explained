@@ -78,8 +78,8 @@ class Tree extends Component {
       // Tree placement and sizing
       treeCellW: 8,
       treeCellH: 10,
-      treeX: 40,
-      treeY: 34,
+      treeX: 88,
+      treeY: 82,
       levelOffset: 7,
       cellHighlight: null,
 
