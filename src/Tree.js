@@ -57,6 +57,7 @@ const colors = {
   plotShadow: "rgba(80,100,120, 0.15)",
   plotLine: rgba("#555", 0.5),
   plotBorder: "#555",
+  plotConeLine: rgba("#555", 0.4),
   plotHighlight: theme.green,
   clear: "rgba(0,0,0,0)"
 };
@@ -67,7 +68,7 @@ class Tree extends Component {
     this.state = {
       // canvas
       width: 1024,
-      height: 720,
+      height: 800,
 
       numCells: 64, // cells in a tree row
       numSquareCells: 8, // cells in a calendar row
@@ -267,13 +268,9 @@ class Tree extends Component {
       .range([0, numMidRows])(t);
   };
   drawCell = (ctx, level, cell) => {
-    const { treeCellH, treeCellW, cellHighlight } = this.state;
+    const { treeCellH, treeCellW } = this.state;
     const expanded = this.isCellExpanded(level, cell);
-    const highlighted =
-      cellHighlight &&
-      cellHighlight.midRes == null &&
-      cellHighlight.cell === cell &&
-      cellHighlight.level === level;
+    const highlighted = this.isCellHighlighted(level, cell);
     if (highlighted) {
       ctx.strokeStyle = colors.cellWallHighlight;
       ctx.fillStyle = colors.cellFillHighlight;
@@ -499,7 +496,15 @@ class Tree extends Component {
     const t = this.getLevelAnimTime(level);
     if (t < 1) return;
 
-    const { plotX, plotW, plotH, treeCellH } = this.state;
+    const {
+      plotX,
+      plotW,
+      plotH,
+      treeCellH,
+      path,
+      levelOffset,
+      cellHighlight
+    } = this.state;
     const { levelData, levelScaleY } = this.ds;
 
     // TODO: use midResChildren if highlighting midRes level
@@ -515,7 +520,7 @@ class Tree extends Component {
     // scales
     const xScale = d3scale
       .scaleLinear()
-      .domain([0, points.length - 1])
+      .domain([-0.5, points.length - 0.5])
       .range([0, plotW]);
     const yScale = levelScaleY[level];
 
@@ -550,6 +555,68 @@ class Tree extends Component {
     line(points);
     ctx.strokeStyle = colors.plotLine;
     ctx.stroke();
+
+    const cellRect = ({ i, min, max }) => {
+      ctx.rect(
+        xScale(i - 0.5),
+        yScale(min),
+        xScale(1) - xScale(0),
+        yScale(max) - yScale(min)
+      );
+    };
+
+    // draw expanded cell
+    const expandedCell = path[level + 1];
+    if (expandedCell != null) {
+      const p = points[expandedCell];
+      ctx.beginPath();
+      cellRect(p);
+      ctx.strokeStyle = colors.cellWallExpanded;
+      ctx.stroke();
+
+      const topx0 = xScale(p.i - 0.5);
+      const topx1 = xScale(p.i + 0.5);
+      const topy = yScale(p.min);
+
+      const midy = plotH;
+
+      const botx0 = 0;
+      const botx1 = plotW;
+      const boty = levelOffset * treeCellH;
+
+      ctx.beginPath();
+      ctx.moveTo(topx0, topy);
+      ctx.lineTo(topx0, midy);
+      ctx.moveTo(topx1, topy);
+      ctx.lineTo(topx1, midy);
+      ctx.setLineDash([3, 2]);
+      ctx.strokeStyle = colors.plotConeLine;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.lineTo(topx0, midy);
+      ctx.lineTo(botx0, boty);
+      ctx.lineTo(botx1, boty);
+      ctx.lineTo(topx1, midy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // ctx.fillStyle = colors.zoomCone;
+      // ctx.fill();
+    }
+
+    // draw highlighted cell
+    if (
+      cellHighlight &&
+      cellHighlight.midRes == null &&
+      cellHighlight.level === level
+    ) {
+      const p = points[cellHighlight.cell];
+      ctx.beginPath();
+      cellRect(p);
+      ctx.strokeStyle = colors.cellWallHighlight;
+      ctx.stroke();
+      ctx.fillStyle = colors.cellFillHighlight;
+      ctx.fill();
+    }
 
     ctx.restore();
   };
@@ -628,6 +695,15 @@ class Tree extends Component {
   isCellExpanded = (level, cell) => {
     return this.state.path[level + 1] === cell;
   };
+  isCellHighlighted = (level, cell, midRes) => {
+    const { cellHighlight } = this.state;
+    return (
+      cellHighlight &&
+      cellHighlight.midRes === midRes &&
+      cellHighlight.cell === cell &&
+      cellHighlight.level === level
+    );
+  };
   midResStart = (parent, exp) => {
     // 0 <= parent < 64   (the child node of previous level that we are expanding)
     // 0 <= exp <= 6 (the resolution row => numMidCells = 2^exp)
@@ -638,7 +714,7 @@ class Tree extends Component {
       .domain([0, numCells - 1])
       .range([0, numCells - numMidCells])(parent);
   };
-  mouseToPath = (x, y) => {
+  mouseToTreePath = (x, y) => {
     const {
       treeX,
       treeY,
@@ -647,7 +723,10 @@ class Tree extends Component {
       levelOffset,
       path
     } = this.state;
-    const { numMidRows } = this.ds;
+    const { numMidRows, treeW } = this.ds;
+
+    const inside = treeX <= x && x < treeX + treeW;
+    if (!inside) return;
 
     const gridY = Math.floor((y - treeY) / treeCellH);
     let level = Math.floor(gridY / levelOffset);
@@ -674,6 +753,36 @@ class Tree extends Component {
         }
       }
     }
+  };
+  mouseToPlotPath = (x, y) => {
+    const {
+      treeX,
+      treeY,
+      plotX,
+      plotW,
+      treeCellH,
+      plotH,
+      levelOffset
+    } = this.state;
+
+    const leftX = treeX + plotX;
+    const inside = leftX <= x && x < leftX + plotW;
+    if (!inside) return;
+
+    const topY = treeY + treeCellH / 2 - plotH / 2;
+    const offsetY = levelOffset * treeCellH;
+
+    const level = Math.floor((y - topY) / offsetY);
+    const levelY = y % offsetY;
+
+    if (levelY < plotH && this.isLevelVisible(level)) {
+      const cell = Math.floor((x - leftX) / plotW * 64);
+      return { level, cell };
+    }
+    // TODO: mid-resolution mouse-over
+  };
+  mouseToPath = (x, y) => {
+    return this.mouseToTreePath(x, y) || this.mouseToPlotPath(x, y);
   };
   scrubAnim = (x, y) => {
     const { treeY, path } = this.state;
