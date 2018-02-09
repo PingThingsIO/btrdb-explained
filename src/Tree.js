@@ -508,7 +508,15 @@ class Tree extends Component {
     const { levelData, levelScaleY } = this.ds;
 
     // TODO: use midResChildren if highlighting midRes level
-    const points = levelData[level].children.map(({ min, mean, max }, i) => ({
+    const data = levelData[level];
+    const midRes =
+      cellHighlight &&
+      cellHighlight.level === level &&
+      cellHighlight.midRes != null
+        ? cellHighlight.midRes
+        : null;
+    const rawPoints = data.midResChildren[midRes] || data.children;
+    const points = rawPoints.map(({ min, mean, max }, i) => ({
       min,
       mean,
       max,
@@ -567,7 +575,7 @@ class Tree extends Component {
 
     // draw expanded cell
     const expandedCell = path[level + 1];
-    if (expandedCell != null) {
+    if (midRes == null && expandedCell != null) {
       const p = points[expandedCell];
       ctx.beginPath();
       cellRect(p);
