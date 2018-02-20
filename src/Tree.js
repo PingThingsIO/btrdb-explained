@@ -564,13 +564,17 @@ class Tree extends Component {
     ctx.strokeStyle = colors.plotLine;
     ctx.stroke();
 
-    const cellRect = ({ i, min, max }) => {
-      ctx.rect(
-        xScale(i - 0.5),
-        yScale(min),
-        xScale(1) - xScale(0),
-        yScale(max) - yScale(min)
-      );
+    const cellRect = ({ i, min, max }, res) => {
+      // custom scale if we use lower resolution
+      const xs =
+        res == null
+          ? xScale
+          : d3scale
+              .scaleLinear()
+              .domain([-0.5, 2 ** res - 0.5])
+              .range([0, plotW]);
+      const ys = yScale;
+      ctx.rect(xs(i - 0.5), ys(min), xs(1) - xs(0), ys(max) - ys(min));
     };
 
     // draw expanded cell
@@ -614,12 +618,12 @@ class Tree extends Component {
     // draw highlighted cell
     if (
       cellHighlight &&
-      cellHighlight.midRes == null &&
-      cellHighlight.level === level
+      cellHighlight.level === level &&
+      cellHighlight.cell != null
     ) {
       const p = points[cellHighlight.cell];
       ctx.beginPath();
-      cellRect(p);
+      cellRect(p, cellHighlight.midRes);
       ctx.strokeStyle = colors.cellWallHighlight;
       ctx.stroke();
       ctx.fillStyle = colors.cellFillHighlight;
