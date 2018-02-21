@@ -62,6 +62,46 @@ const colors = {
   clear: "rgba(0,0,0,0)"
 };
 
+const leftOfPath = path => {
+  if (!path || !path.length) return;
+
+  const i = path[path.length - 1];
+  if (i > 0) {
+    const sibling = path.slice(0);
+    sibling.pop();
+    sibling.push(i - 1);
+    return sibling;
+  }
+
+  const parent = path.slice(0, path.length - 1);
+  const newParent = leftOfPath(parent);
+  if (newParent) {
+    const cousin = newParent.slice(0);
+    cousin.push(63);
+    return cousin;
+  }
+};
+
+const rightOfPath = path => {
+  if (!path || !path.length) return;
+
+  const i = path[path.length - 1];
+  if (i < 63) {
+    const sibling = path.slice(0);
+    sibling.pop();
+    sibling.push(i + 1);
+    return sibling;
+  }
+
+  const parent = path.slice(0, path.length - 1);
+  const newParent = rightOfPath(parent);
+  if (newParent) {
+    const cousin = newParent.slice(0);
+    cousin.push(0);
+    return cousin;
+  }
+};
+
 class Tree extends Component {
   constructor(props) {
     super(props);
