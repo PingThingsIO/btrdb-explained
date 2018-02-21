@@ -83,8 +83,12 @@ function getNoise(path) {
   const mean = meanNoise[level].scaled([x, meanNoiseTime]);
   const min = mean - shadowNoise[level].scaled([x, minNoiseTime]);
   const max = mean + shadowNoise[level].scaled([x, maxNoiseTime]);
-  // TODO: add count
-  return { mean, min, max };
+
+  // assume uniform distribution of points
+  const count = 2 ** (6 * (9 - level));
+  return count === 1
+    ? { count, mean, min: mean, max: mean }
+    : { count, mean, min, max };
 }
 
 function cacheLookup(cache, path) {
@@ -135,6 +139,8 @@ function cacheWrite(cache, path, children) {
 function fitChildren(points, parent) {
   // Get mean-centered points.
   // NOTE: disregarding count currently
+  const { count } = points[0];
+
   const localMean = d3array.sum(points, p => p.mean) / points.length;
   const center = localMean;
   const relative = points.map(({ min, mean, max }) => ({
@@ -174,15 +180,27 @@ function fitChildren(points, parent) {
   const fitPoint = (rel, k) => ({
     mean: parent.mean + rel.mean * k,
     min: parent.mean + rel.min * k,
-    max: parent.mean + rel.max * k
+    max: parent.mean + rel.max * k,
+    count
   });
   const fitPoints = relative.map(rel => fitPoint(rel, stretch));
 
   // Since we are only guaranteed _one_ local bound is flushed against the
   // global bounds, we stretch the two min and max points to the bounds manually
   // to ensure to ensure both bounds are equal.
-  fitPoints[indexOfMin].min = parent.min;
-  fitPoints[indexOfMax].max = parent.max;
+  const minPoint = fitPoints[indexOfMin];
+  const maxPoint = fitPoints[indexOfMax];
+
+  if (count === 1) {
+    const setAll = (p, v) => (p.mean = p.min = p.max = v);
+    setAll(minPoint, parent.min);
+    setAll(maxPoint, parent.max);
+    // TODO: we have to adjust the mean of other point(s) to correct the balance
+    // such that all points still average to the correct amount.
+  } else {
+    minPoint.min = parent.min;
+    maxPoint.max = parent.max;
+  }
 
   return fitPoints;
 }
