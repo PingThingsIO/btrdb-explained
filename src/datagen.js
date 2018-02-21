@@ -150,11 +150,20 @@ function fitChildren(points, parent) {
 
   // Get the minimum scale that we must stretch the local points such that
   // they are contained inside the global bounds.
-  const fit = k =>
-    globalRelMin <= localRelMin * k && localRelMax * k <= globalRelMax;
   const minStretch = globalRelMin / localRelMin;
   const maxStretch = globalRelMax / localRelMax;
-  const stretch = fit(minStretch) ? minStretch : maxStretch;
+  const minFitDelta = globalRelMax - localRelMax * minStretch;
+  const maxFitDelta = localRelMin * maxStretch - globalRelMin;
+  const stretch =
+    minFitDelta >= 0
+      ? minStretch
+      : maxFitDelta >= 0
+        ? maxStretch
+        : // floating point precision errors can cause slight overshoots, so choose
+          // the one with the smallest delta.
+          Math.abs(minFitDelta) < Math.abs(maxFitDelta)
+          ? minStretch
+          : maxStretch;
 
   // Fit points to target bounds as best we can w/ recentering and uniform scaling.
   const fitPoint = (rel, k) => ({
