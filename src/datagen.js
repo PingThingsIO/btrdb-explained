@@ -65,7 +65,12 @@ const maxNoiseTime = 80;
 function getNoiseXFromPath(path) {
   let exp = 0;
   let x = 0;
-  for (let i = path.length - 1; i >= 0; i--) {
+
+  // We can't go back further than 8 levels to compute x since floating points
+  // can't support numbers that high.
+  const rootI = Math.max(0, path.length - 8);
+
+  for (let i = path.length - 1; i >= rootI; i--) {
     x += path[i] * 2 ** exp;
     exp += 6;
   }
