@@ -8,6 +8,7 @@ import * as d3array from "d3-array";
 import * as d3color from "d3-color";
 import * as d3shape from "d3-shape";
 import { getStatPoint } from "./datagen";
+import * as R from "ramda";
 
 const nodeLengthLabels = [
   "146 years",
@@ -246,7 +247,54 @@ class Tree extends Component {
     const levelPaths = d3array
       .range(path.length)
       .map(i => path.slice(1, i + 1));
-    const levelData = levelPaths.map(path => getStatPoint(path));
+    const levelData = levelPaths.map(path => {
+      const data = getStatPoint(path);
+
+      // get adjacent points on either side of this path's node
+      const leftPath = leftOfPath(path);
+      const rightPath = rightOfPath(path);
+      getStatPoint(R.append(0, leftPath));
+      getStatPoint(R.append(0, rightPath));
+      const leftData = getStatPoint(leftPath);
+      const rightData = getStatPoint(rightPath);
+
+      // pad the given points with adjacent left/right points
+      const pad = (points, midRes) => {
+        const newPoints = points.slice(0);
+        if (leftData) {
+          newPoints[-1] =
+            midRes == null
+              ? R.last(leftData.children)
+              : R.last(leftData.midResChildren[midRes]);
+        }
+        if (rightData) {
+          newPoints.push(
+            midRes == null
+              ? rightData.children[0]
+              : rightData.midResChildren[midRes][0]
+          );
+        }
+        return newPoints;
+      };
+
+      // add index key to each point
+      const addIndexes = points => {
+        const addIndex = (v, i) => R.assoc("i", i, v);
+        const newPoints = points.map(addIndex);
+        if (points[-1]) {
+          newPoints[-1] = addIndex(points[-1], -1);
+        }
+        return newPoints;
+      };
+
+      const newData = R.merge(data, {
+        children: addIndexes(pad(data.children)),
+        midResChildren: data.midResChildren.map(
+          (points, midRes) => points && addIndexes(pad(points))
+        )
+      });
+      return newData;
+    });
     const levelScaleY = levelData.map(({ min, max }) =>
       d3scale
         .scaleLinear()
