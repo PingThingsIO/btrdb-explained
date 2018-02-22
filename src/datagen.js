@@ -212,7 +212,7 @@ function getStatPoint(path, cache) {
   if (path.length === 0) return cache;
 
   let point = cacheLookup(cache, path);
-  if (!point || !point.children) {
+  if (!point) {
     const parentPath = path.slice(0, -1);
     const points = d3array.range(64).map(i => getNoise([...parentPath, i]));
     const parent = getStatPoint(parentPath, cache);

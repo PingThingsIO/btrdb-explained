@@ -103,6 +103,10 @@ const rightOfPath = path => {
   }
 };
 
+const padded = array => {
+  return array[-1] ? R.prepend(array[-1], array) : array;
+};
+
 class Tree extends Component {
   constructor(props) {
     super(props);
@@ -603,20 +607,15 @@ class Tree extends Component {
       cellHighlight.midRes != null
         ? cellHighlight.midRes
         : null;
-    const rawPoints = data.midResChildren[midRes] || data.children;
-    const points = rawPoints.map(({ min, mean, max }, i) => ({
-      min,
-      mean,
-      max,
-      i
-    }));
+    const points = data.midResChildren[midRes] || data.children;
+    const numPoints = midRes == null ? 64 : 2 ** midRes;
 
     if (!points) return;
 
     // scales
     const xScale = d3scale
       .scaleLinear()
-      .domain([-0.5, points.length - 0.5])
+      .domain([-0.5, numPoints - 0.5])
       .range([0, plotW]);
     const yScale = levelScaleY[level];
 
@@ -640,17 +639,24 @@ class Tree extends Component {
     ctx.strokeStyle = colors.plotBorder;
     ctx.strokeRect(0, 0, plotW, plotH);
 
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, plotW, plotH);
+    ctx.clip();
+
     // draw min/max shadow
     ctx.beginPath();
-    shadow(points);
+    shadow(padded(points));
     ctx.fillStyle = colors.plotShadow;
     ctx.fill();
 
     // draw mean
     ctx.beginPath();
-    line(points);
+    line(padded(points));
     ctx.strokeStyle = colors.plotLine;
     ctx.stroke();
+
+    ctx.restore();
 
     const cellRect = ({ i, min, max }, res) => {
       // custom scale if we use lower resolution
