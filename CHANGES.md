@@ -1,3 +1,11 @@
+## v2018.03.19
+
+[demo permalink][demo-2018-03-19]
+
+- Replace line plots with bounding box plots, to clarify mid-res cell relationships
+
+[demo-2018-03-19]:http://btrdb-viz-2018-03-19.surge.sh
+
 ## v2018.02.08
 
 [screenshot][screenshot-2018-02-08] | [demo permalink][demo-2018-02-08]
