@@ -30,6 +30,10 @@ function rgba(color, opacity) {
   return c + "";
 }
 
+function rgbaSolid(color, bgColor, opacity) {
+  return d3interpolate.interpolate(bgColor, color)(opacity);
+}
+
 const theme = {
   green: "#1eb7aa",
   orange: "#db7b35"
@@ -41,6 +45,8 @@ const colors = {
   cellWall: rgba("#555", 0.1),
   cellWallExpanded: "#555",
   cellWallHighlight: theme.green,
+
+  plotGridLine: rgbaSolid("#555", "#fff", 0.2),
 
   nodeFill: "#fff",
   nodeStroke: "#000",
@@ -112,7 +118,7 @@ class Tree extends Component {
     super(props);
     this.state = {
       // canvas
-      width: 1024,
+      width: 1280,
       height: 800,
 
       numCells: 64, // cells in a tree row
@@ -131,7 +137,7 @@ class Tree extends Component {
 
       // Plot placement and sizing
       plotX: 620,
-      plotW: 256,
+      plotW: 320,
       plotH: 40,
 
       // Calendar placement and sizing
@@ -607,124 +613,182 @@ class Tree extends Component {
       cellHighlight.midRes != null
         ? cellHighlight.midRes
         : null;
+
     const points = data.midResChildren[midRes] || data.children;
     const numPoints = midRes == null ? 64 : 2 ** midRes;
 
     if (!points) return;
 
-    // scales
-    const xScale = d3scale
-      .scaleLinear()
-      .domain([-0.5, numPoints - 0.5])
-      .range([0, plotW]);
-    const yScale = levelScaleY[level];
-
-    // shapes
-    const line = d3shape
-      .line()
-      .context(ctx)
-      .x(({ i }) => xScale(i))
-      .y(({ mean }) => yScale(mean));
-    const shadow = d3shape
-      .area()
-      .context(ctx)
-      .x(({ i }) => xScale(i))
-      .y0(({ min }) => yScale(min))
-      .y1(({ max }) => yScale(max));
-
-    ctx.save();
-    ctx.translate(plotX, treeCellH / 2 - plotH / 2);
+    if (midRes != null) {
+      ctx.save();
+      ctx.globalAlpha *= 0.5;
+      drawPoints(data.children, 64, true);
+      ctx.restore();
+    }
+    drawPoints(points, numPoints);
 
     // draw border
+    ctx.save();
+    ctx.translate(plotX, treeCellH / 2 - plotH / 2);
     ctx.strokeStyle = colors.plotBorder;
     ctx.strokeRect(0, 0, plotW, plotH);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, plotW, plotH);
-    ctx.clip();
-
-    // draw min/max shadow
-    ctx.beginPath();
-    shadow(padded(points));
-    ctx.fillStyle = colors.plotShadow;
-    ctx.fill();
-
-    // draw mean
-    ctx.beginPath();
-    line(padded(points));
-    ctx.strokeStyle = colors.plotLine;
-    ctx.stroke();
-
     ctx.restore();
 
-    const cellRect = ({ i, min, max }, res) => {
-      // custom scale if we use lower resolution
-      const xs =
-        res == null
+    // DRAW POINTS
+    function drawPoints(points, numPoints, hideCellHighlight) {
+      // scales
+      const xScale = d3scale
+        .scaleLinear()
+        .domain([-0.5, numPoints - 0.5])
+        .range([0, plotW]);
+      const yScale = levelScaleY[level];
+
+      // shapes
+      const line = d3shape
+        .line()
+        .context(ctx)
+        .x(({ i }) => xScale(i))
+        .y(({ mean }) => yScale(mean));
+      const shadow = d3shape
+        .area()
+        .context(ctx)
+        .x(({ i }) => xScale(i))
+        .y0(({ min }) => yScale(min))
+        .y1(({ max }) => yScale(max));
+
+      ctx.save();
+      ctx.translate(plotX, treeCellH / 2 - plotH / 2);
+
+      // clip the plot to this rectangle
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, plotW, plotH);
+      ctx.clip();
+
+      // draw min/max shadow
+      ctx.beginPath();
+      shadow(padded(points));
+      ctx.fillStyle = colors.plotShadow;
+      // ctx.fill();
+
+      // draw mean line
+      // ctx.beginPath();
+      // line(padded(points));
+      // ctx.strokeStyle = colors.plotLine;
+      // ctx.stroke();
+
+      // draw mean dots
+      for (let i = 0; i < numPoints; i++) {
+        const { mean } = points[i];
+        const r = 1;
+        ctx.beginPath();
+        ctx.ellipse(xScale(i), yScale(mean), r, r, 0, 0, 2 * Math.PI);
+        ctx.fillStyle = rgba("#000", 0.4);
+        // ctx.fill();
+      }
+
+      // undo clip
+      ctx.restore();
+
+      const xResScale = res => {
+        return res == null
           ? xScale
           : d3scale
               .scaleLinear()
               .domain([-0.5, 2 ** res - 0.5])
               .range([0, plotW]);
-      const ys = yScale;
-      ctx.rect(xs(i - 0.5), ys(min), xs(1) - xs(0), ys(max) - ys(min));
-    };
+      };
 
-    // draw expanded cell
-    const expandedCell = path[level + 1];
-    if (midRes == null && expandedCell != null) {
-      const p = points[expandedCell];
-      ctx.beginPath();
-      cellRect(p);
-      ctx.strokeStyle = colors.cellWallExpanded;
-      ctx.stroke();
+      const cellRect = ({ i, min, max }, res) => {
+        // custom scale if we use lower resolution
+        const xs = xResScale(res);
+        const ys = yScale;
+        ctx.rect(xs(i - 0.5), ys(min), xs(1) - xs(0), ys(max) - ys(min));
+      };
 
-      const topx0 = xScale(p.i - 0.5);
-      const topx1 = xScale(p.i + 0.5);
-      const topy = yScale(p.min);
+      // draw vertical grid lines
+      // ctx.beginPath();
+      // for (let i = 1; i < numPoints; i++) {
+      //   const x = xScale(i - 0.5);
+      //   ctx.moveTo(x, 0);
+      //   ctx.lineTo(x, plotH);
+      // }
+      // ctx.strokeStyle = colors.plotGridLine;
+      // ctx.stroke();
+      for (let i = 0; i < numPoints; i++) {
+        ctx.beginPath();
+        cellRect(points[i]);
+        ctx.strokeStyle = colors.plotGridLine;
+        ctx.stroke();
+      }
 
-      const midy = plotH;
+      // draw expanded cell
+      const expandedCell = path[level + 1];
+      if (midRes == null && expandedCell != null) {
+        const p = points[expandedCell];
+        ctx.beginPath();
+        cellRect(p);
+        ctx.strokeStyle = colors.cellWallExpanded;
+        ctx.stroke();
 
-      const botx0 = 0;
-      const botx1 = plotW;
-      const boty = levelOffset * treeCellH;
+        const topx0 = xScale(p.i - 0.5);
+        const topx1 = xScale(p.i + 0.5);
+        const topy = yScale(p.min);
 
-      ctx.beginPath();
-      ctx.moveTo(topx0, topy);
-      ctx.lineTo(topx0, midy);
-      ctx.moveTo(topx1, topy);
-      ctx.lineTo(topx1, midy);
-      ctx.setLineDash([3, 2]);
-      ctx.strokeStyle = colors.plotConeLine;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.lineTo(topx0, midy);
-      ctx.lineTo(botx0, boty);
-      ctx.lineTo(botx1, boty);
-      ctx.lineTo(topx1, midy);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // ctx.fillStyle = colors.zoomCone;
-      // ctx.fill();
+        const midy = plotH;
+
+        const botx0 = 0;
+        const botx1 = plotW;
+        const boty = levelOffset * treeCellH;
+
+        ctx.beginPath();
+        ctx.moveTo(topx0, topy);
+        ctx.lineTo(topx0, midy);
+        ctx.moveTo(topx1, topy);
+        ctx.lineTo(topx1, midy);
+        ctx.setLineDash([3, 2]);
+        ctx.strokeStyle = colors.plotConeLine;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.lineTo(topx0, midy);
+        ctx.lineTo(botx0, boty);
+        ctx.lineTo(botx1, boty);
+        ctx.lineTo(topx1, midy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // ctx.fillStyle = colors.zoomCone;
+        // ctx.fill();
+      }
+
+      // draw highlighted cell
+      if (
+        !hideCellHighlight &&
+        cellHighlight &&
+        cellHighlight.level === level &&
+        cellHighlight.cell != null
+      ) {
+        const p = points[cellHighlight.cell];
+        ctx.beginPath();
+        cellRect(p, cellHighlight.midRes);
+        // ctx.strokeStyle = colors.cellWallHighlight;
+        ctx.strokeStyle = colors.cellWallExpanded;
+        ctx.stroke();
+        if (midRes != null) {
+          ctx.fillStyle = colors.shadowCone;
+          ctx.fill();
+        }
+        if (midRes == null) {
+          const xs = xResScale(midRes);
+          const ys = yScale;
+          const { i, min, max } = p;
+          ctx.fillStyle = colors.shadowCone;
+          ctx.fillRect(xs(i - 0.5), 0, xs(1) - xs(0), ys(min));
+          ctx.fillRect(xs(i - 0.5), ys(max), xs(1) - xs(0), plotH - ys(max));
+        }
+      }
+
+      ctx.restore();
     }
-
-    // draw highlighted cell
-    if (
-      cellHighlight &&
-      cellHighlight.level === level &&
-      cellHighlight.cell != null
-    ) {
-      const p = points[cellHighlight.cell];
-      ctx.beginPath();
-      cellRect(p, cellHighlight.midRes);
-      ctx.strokeStyle = colors.cellWallHighlight;
-      ctx.stroke();
-      ctx.fillStyle = colors.cellFillHighlight;
-      ctx.fill();
-    }
-
-    ctx.restore();
   };
   drawLevel = (ctx, level) => {
     const t = this.getLevelAnimTime(level);

@@ -10,7 +10,7 @@ export default function() {
         <header>
           <img src={logo} className="Demo-logo" alt="PingThings" />
         </header>
-        <div className="Demo-version">{"BTrDB Viz v2018.02.08"}</div>
+        <div className="Demo-version">{"BTrDB Viz v2018.03.19"}</div>
         <div className="Demo-notes">
           <p>
             Zooming into a BTrDB tree is achieved by descending its branches, so
@@ -24,8 +24,7 @@ export default function() {
           </ul>
           <h3>Changes</h3>
           <ul>
-            <li>Populate w/ Noise</li>
-            <li>Draw Plot</li>
+            <li>Replace plot with bounding boxes</li>
           </ul>
           <h3>Next</h3>
           <ul>
