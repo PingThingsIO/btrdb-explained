@@ -8,6 +8,7 @@ import * as d3array from "d3-array";
 import * as d3color from "d3-color";
 import * as d3shape from "d3-shape";
 import { getStatPoint } from "./datagen";
+import * as R from "ramda";
 
 const nodeLengthLabels = [
   "146 years",
@@ -29,6 +30,10 @@ function rgba(color, opacity) {
   return c + "";
 }
 
+function rgbaSolid(color, bgColor, opacity) {
+  return d3interpolate.interpolate(bgColor, color)(opacity);
+}
+
 const theme = {
   green: "#1eb7aa",
   orange: "#db7b35"
@@ -40,6 +45,8 @@ const colors = {
   cellWall: rgba("#555", 0.1),
   cellWallExpanded: "#555",
   cellWallHighlight: theme.green,
+
+  plotGridLine: rgbaSolid("#555", "#fff", 0.2),
 
   nodeFill: "#fff",
   nodeStroke: "#000",
@@ -57,8 +64,53 @@ const colors = {
   plotShadow: "rgba(80,100,120, 0.15)",
   plotLine: rgba("#555", 0.5),
   plotBorder: "#555",
+  plotConeLine: rgba("#555", 0.4),
   plotHighlight: theme.green,
   clear: "rgba(0,0,0,0)"
+};
+
+const leftOfPath = path => {
+  if (!path || !path.length) return;
+
+  const i = path[path.length - 1];
+  if (i > 0) {
+    const sibling = path.slice(0);
+    sibling.pop();
+    sibling.push(i - 1);
+    return sibling;
+  }
+
+  const parent = path.slice(0, path.length - 1);
+  const newParent = leftOfPath(parent);
+  if (newParent) {
+    const cousin = newParent.slice(0);
+    cousin.push(63);
+    return cousin;
+  }
+};
+
+const rightOfPath = path => {
+  if (!path || !path.length) return;
+
+  const i = path[path.length - 1];
+  if (i < 63) {
+    const sibling = path.slice(0);
+    sibling.pop();
+    sibling.push(i + 1);
+    return sibling;
+  }
+
+  const parent = path.slice(0, path.length - 1);
+  const newParent = rightOfPath(parent);
+  if (newParent) {
+    const cousin = newParent.slice(0);
+    cousin.push(0);
+    return cousin;
+  }
+};
+
+const padded = array => {
+  return array[-1] ? R.prepend(array[-1], array) : array;
 };
 
 class Tree extends Component {
@@ -66,8 +118,8 @@ class Tree extends Component {
     super(props);
     this.state = {
       // canvas
-      width: 1024,
-      height: 720,
+      width: 1280,
+      height: 800,
 
       numCells: 64, // cells in a tree row
       numSquareCells: 8, // cells in a calendar row
@@ -78,14 +130,14 @@ class Tree extends Component {
       // Tree placement and sizing
       treeCellW: 8,
       treeCellH: 10,
-      treeX: 40,
-      treeY: 34,
+      treeX: 88,
+      treeY: 82,
       levelOffset: 7,
       cellHighlight: null,
 
       // Plot placement and sizing
       plotX: 620,
-      plotW: 256,
+      plotW: 320,
       plotH: 40,
 
       // Calendar placement and sizing
@@ -205,7 +257,54 @@ class Tree extends Component {
     const levelPaths = d3array
       .range(path.length)
       .map(i => path.slice(1, i + 1));
-    const levelData = levelPaths.map(path => getStatPoint(path));
+    const levelData = levelPaths.map(path => {
+      const data = getStatPoint(path);
+
+      // get adjacent points on either side of this path's node
+      const leftPath = leftOfPath(path);
+      const rightPath = rightOfPath(path);
+      getStatPoint(R.append(0, leftPath));
+      getStatPoint(R.append(0, rightPath));
+      const leftData = getStatPoint(leftPath);
+      const rightData = getStatPoint(rightPath);
+
+      // pad the given points with adjacent left/right points
+      const pad = (points, midRes) => {
+        const newPoints = points.slice(0);
+        if (leftData) {
+          newPoints[-1] =
+            midRes == null
+              ? R.last(leftData.children)
+              : R.last(leftData.midResChildren[midRes]);
+        }
+        if (rightData) {
+          newPoints.push(
+            midRes == null
+              ? rightData.children[0]
+              : rightData.midResChildren[midRes][0]
+          );
+        }
+        return newPoints;
+      };
+
+      // add index key to each point
+      const addIndexes = points => {
+        const addIndex = (v, i) => R.assoc("i", i, v);
+        const newPoints = points.map(addIndex);
+        if (points[-1]) {
+          newPoints[-1] = addIndex(points[-1], -1);
+        }
+        return newPoints;
+      };
+
+      const newData = R.merge(data, {
+        children: addIndexes(pad(data.children)),
+        midResChildren: data.midResChildren.map(
+          (points, midRes) => points && addIndexes(pad(points))
+        )
+      });
+      return newData;
+    });
     const levelScaleY = levelData.map(({ min, max }) =>
       d3scale
         .scaleLinear()
@@ -267,13 +366,9 @@ class Tree extends Component {
       .range([0, numMidRows])(t);
   };
   drawCell = (ctx, level, cell) => {
-    const { treeCellH, treeCellW, cellHighlight } = this.state;
+    const { treeCellH, treeCellW } = this.state;
     const expanded = this.isCellExpanded(level, cell);
-    const highlighted =
-      cellHighlight &&
-      cellHighlight.midRes == null &&
-      cellHighlight.cell === cell &&
-      cellHighlight.level === level;
+    const highlighted = this.isCellHighlighted(level, cell);
     if (highlighted) {
       ctx.strokeStyle = colors.cellWallHighlight;
       ctx.fillStyle = colors.cellFillHighlight;
@@ -499,59 +594,201 @@ class Tree extends Component {
     const t = this.getLevelAnimTime(level);
     if (t < 1) return;
 
-    const { plotX, plotW, plotH, treeCellH } = this.state;
+    const {
+      plotX,
+      plotW,
+      plotH,
+      treeCellH,
+      path,
+      levelOffset,
+      cellHighlight
+    } = this.state;
     const { levelData, levelScaleY } = this.ds;
 
     // TODO: use midResChildren if highlighting midRes level
-    const points = levelData[level].children.map(({ min, mean, max }, i) => ({
-      min,
-      mean,
-      max,
-      i
-    }));
+    const data = levelData[level];
+    const midRes =
+      cellHighlight &&
+      cellHighlight.level === level &&
+      cellHighlight.midRes != null
+        ? cellHighlight.midRes
+        : null;
+
+    const points = data.midResChildren[midRes] || data.children;
+    const numPoints = midRes == null ? 64 : 2 ** midRes;
 
     if (!points) return;
 
-    // scales
-    const xScale = d3scale
-      .scaleLinear()
-      .domain([0, points.length - 1])
-      .range([0, plotW]);
-    const yScale = levelScaleY[level];
-
-    // shapes
-    const line = d3shape
-      .line()
-      .context(ctx)
-      .x(({ i }) => xScale(i))
-      .y(({ mean }) => yScale(mean));
-    const shadow = d3shape
-      .area()
-      .context(ctx)
-      .x(({ i }) => xScale(i))
-      .y0(({ min }) => yScale(min))
-      .y1(({ max }) => yScale(max));
-
-    ctx.save();
-    ctx.translate(plotX, treeCellH / 2 - plotH / 2);
+    if (midRes != null) {
+      ctx.save();
+      ctx.globalAlpha *= 0.5;
+      drawPoints(data.children, 64, true);
+      ctx.restore();
+    }
+    drawPoints(points, numPoints);
 
     // draw border
+    ctx.save();
+    ctx.translate(plotX, treeCellH / 2 - plotH / 2);
     ctx.strokeStyle = colors.plotBorder;
     ctx.strokeRect(0, 0, plotW, plotH);
-
-    // draw min/max shadow
-    ctx.beginPath();
-    shadow(points);
-    ctx.fillStyle = colors.plotShadow;
-    ctx.fill();
-
-    // draw mean
-    ctx.beginPath();
-    line(points);
-    ctx.strokeStyle = colors.plotLine;
-    ctx.stroke();
-
     ctx.restore();
+
+    // DRAW POINTS
+    function drawPoints(points, numPoints, hideCellHighlight) {
+      // scales
+      const xScale = d3scale
+        .scaleLinear()
+        .domain([-0.5, numPoints - 0.5])
+        .range([0, plotW]);
+      const yScale = levelScaleY[level];
+
+      // shapes
+      const line = d3shape
+        .line()
+        .context(ctx)
+        .x(({ i }) => xScale(i))
+        .y(({ mean }) => yScale(mean));
+      const shadow = d3shape
+        .area()
+        .context(ctx)
+        .x(({ i }) => xScale(i))
+        .y0(({ min }) => yScale(min))
+        .y1(({ max }) => yScale(max));
+
+      ctx.save();
+      ctx.translate(plotX, treeCellH / 2 - plotH / 2);
+
+      // clip the plot to this rectangle
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, plotW, plotH);
+      ctx.clip();
+
+      // draw min/max shadow
+      ctx.beginPath();
+      shadow(padded(points));
+      ctx.fillStyle = colors.plotShadow;
+      // ctx.fill();
+
+      // draw mean line
+      // ctx.beginPath();
+      // line(padded(points));
+      // ctx.strokeStyle = colors.plotLine;
+      // ctx.stroke();
+
+      // draw mean dots
+      for (let i = 0; i < numPoints; i++) {
+        const { mean } = points[i];
+        const r = 1;
+        ctx.beginPath();
+        ctx.ellipse(xScale(i), yScale(mean), r, r, 0, 0, 2 * Math.PI);
+        ctx.fillStyle = rgba("#000", 0.4);
+        // ctx.fill();
+      }
+
+      // undo clip
+      ctx.restore();
+
+      const xResScale = res => {
+        return res == null
+          ? xScale
+          : d3scale
+              .scaleLinear()
+              .domain([-0.5, 2 ** res - 0.5])
+              .range([0, plotW]);
+      };
+
+      const cellRect = ({ i, min, max }, res) => {
+        // custom scale if we use lower resolution
+        const xs = xResScale(res);
+        const ys = yScale;
+        ctx.rect(xs(i - 0.5), ys(min), xs(1) - xs(0), ys(max) - ys(min));
+      };
+
+      // draw vertical grid lines
+      // ctx.beginPath();
+      // for (let i = 1; i < numPoints; i++) {
+      //   const x = xScale(i - 0.5);
+      //   ctx.moveTo(x, 0);
+      //   ctx.lineTo(x, plotH);
+      // }
+      // ctx.strokeStyle = colors.plotGridLine;
+      // ctx.stroke();
+      for (let i = 0; i < numPoints; i++) {
+        ctx.beginPath();
+        cellRect(points[i]);
+        ctx.strokeStyle = colors.plotGridLine;
+        ctx.stroke();
+      }
+
+      // draw expanded cell
+      const expandedCell = path[level + 1];
+      if (midRes == null && expandedCell != null) {
+        const p = points[expandedCell];
+        ctx.beginPath();
+        cellRect(p);
+        ctx.strokeStyle = colors.cellWallExpanded;
+        ctx.stroke();
+
+        const topx0 = xScale(p.i - 0.5);
+        const topx1 = xScale(p.i + 0.5);
+        const topy = yScale(p.min);
+
+        const midy = plotH;
+
+        const botx0 = 0;
+        const botx1 = plotW;
+        const boty = levelOffset * treeCellH;
+
+        ctx.beginPath();
+        ctx.moveTo(topx0, topy);
+        ctx.lineTo(topx0, midy);
+        ctx.moveTo(topx1, topy);
+        ctx.lineTo(topx1, midy);
+        ctx.setLineDash([3, 2]);
+        ctx.strokeStyle = colors.plotConeLine;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.lineTo(topx0, midy);
+        ctx.lineTo(botx0, boty);
+        ctx.lineTo(botx1, boty);
+        ctx.lineTo(topx1, midy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // ctx.fillStyle = colors.zoomCone;
+        // ctx.fill();
+      }
+
+      // draw highlighted cell
+      if (
+        !hideCellHighlight &&
+        cellHighlight &&
+        cellHighlight.level === level &&
+        cellHighlight.cell != null
+      ) {
+        const p = points[cellHighlight.cell];
+        ctx.beginPath();
+        cellRect(p, cellHighlight.midRes);
+        // ctx.strokeStyle = colors.cellWallHighlight;
+        ctx.strokeStyle = colors.cellWallExpanded;
+        ctx.stroke();
+        if (midRes != null) {
+          ctx.fillStyle = colors.shadowCone;
+          ctx.fill();
+        }
+        if (midRes == null) {
+          const xs = xResScale(midRes);
+          const ys = yScale;
+          const { i, min, max } = p;
+          ctx.fillStyle = colors.shadowCone;
+          ctx.fillRect(xs(i - 0.5), 0, xs(1) - xs(0), ys(min));
+          ctx.fillRect(xs(i - 0.5), ys(max), xs(1) - xs(0), plotH - ys(max));
+        }
+      }
+
+      ctx.restore();
+    }
   };
   drawLevel = (ctx, level) => {
     const t = this.getLevelAnimTime(level);
@@ -628,6 +865,15 @@ class Tree extends Component {
   isCellExpanded = (level, cell) => {
     return this.state.path[level + 1] === cell;
   };
+  isCellHighlighted = (level, cell, midRes) => {
+    const { cellHighlight } = this.state;
+    return (
+      cellHighlight &&
+      cellHighlight.midRes === midRes &&
+      cellHighlight.cell === cell &&
+      cellHighlight.level === level
+    );
+  };
   midResStart = (parent, exp) => {
     // 0 <= parent < 64   (the child node of previous level that we are expanding)
     // 0 <= exp <= 6 (the resolution row => numMidCells = 2^exp)
@@ -638,7 +884,7 @@ class Tree extends Component {
       .domain([0, numCells - 1])
       .range([0, numCells - numMidCells])(parent);
   };
-  mouseToPath = (x, y) => {
+  mouseToTreePath = (x, y) => {
     const {
       treeX,
       treeY,
@@ -647,7 +893,10 @@ class Tree extends Component {
       levelOffset,
       path
     } = this.state;
-    const { numMidRows } = this.ds;
+    const { numMidRows, treeW } = this.ds;
+
+    const inside = treeX <= x && x < treeX + treeW;
+    if (!inside) return;
 
     const gridY = Math.floor((y - treeY) / treeCellH);
     let level = Math.floor(gridY / levelOffset);
@@ -674,6 +923,36 @@ class Tree extends Component {
         }
       }
     }
+  };
+  mouseToPlotPath = (x, y) => {
+    const {
+      treeX,
+      treeY,
+      plotX,
+      plotW,
+      treeCellH,
+      plotH,
+      levelOffset
+    } = this.state;
+
+    const leftX = treeX + plotX;
+    const inside = leftX <= x && x < leftX + plotW;
+    if (!inside) return;
+
+    const topY = treeY + treeCellH / 2 - plotH / 2;
+    const offsetY = levelOffset * treeCellH;
+
+    const level = Math.floor((y - topY) / offsetY);
+    const levelY = y % offsetY;
+
+    if (levelY < plotH && this.isLevelVisible(level)) {
+      const cell = Math.floor((x - leftX) / plotW * 64);
+      return { level, cell };
+    }
+    // TODO: mid-resolution mouse-over
+  };
+  mouseToPath = (x, y) => {
+    return this.mouseToTreePath(x, y) || this.mouseToPlotPath(x, y);
   };
   scrubAnim = (x, y) => {
     const { treeY, path } = this.state;
