@@ -9,6 +9,7 @@ import * as d3color from "d3-color";
 import * as d3shape from "d3-shape";
 import { getStatPoint } from "./datagen";
 import * as R from "ramda";
+import { BigNumber } from "bignumber.js";
 
 const nodeLengthLabels = [
   "146 years",
@@ -145,7 +146,7 @@ class Tree extends Component {
       calX: 700,
       calY: 40,
 
-      rootStart: -1152921504606846976,
+      rootStart: BigNumber("-1152921504606846976"),
       rootResolution: 56
 
       // TODO:
@@ -218,26 +219,25 @@ class Tree extends Component {
     const calW = calCellSize * numSquareCells;
 
     // compute scale for each level
-    const pw = res => Math.pow(2, res);
     let start = rootStart;
     let res = rootResolution;
     const treeTimeX = [];
     const calTimeK = [];
     for (let i = 0; i < path.length; i++) {
-      const end = start + pw(res) * numCells;
+      const end = start.plus(2 ** res * numCells);
       const domain = [start, end];
       treeTimeX.push(
-        scaleTimeNano()
+        scaleTimeNano(BigNumber)
           .domain(domain)
           .range([0, treeW])
       );
       calTimeK.push(
-        scaleTimeNano()
+        scaleTimeNano(BigNumber)
           .domain(domain)
           .range([0, calW * numSquareCells])
       );
       if (i + 1 < path.length) {
-        start += pw(res) * path[i + 1];
+        start = start.plus(2 ** res * path[i + 1]);
       }
       res -= 6;
     }
@@ -571,13 +571,10 @@ class Tree extends Component {
       };
       const count = 8;
       const ticks = treeTimeX[level].ticks(count);
-      const tickFormat = treeTimeX[level].tickFormat(count);
+      const tickFormat = treeTimeX[level].tickFormat();
       for (let i = 0; i < ticks.length; i++) {
         const tickTime = ticks[i];
-        // nanosecond ticks sometimes duplicate
-        if (ticks[i] !== ticks[i - 1]) {
-          drawTick(tickTime, tickFormat(tickTime));
-        }
+        drawTick(tickTime, tickFormat(tickTime));
       }
     }
 
