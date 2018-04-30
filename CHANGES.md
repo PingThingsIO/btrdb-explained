@@ -1,3 +1,11 @@
+## v2018.04.30
+
+[demo permalink][demo-2018-04-30]
+
+* Fix nanosecond time scale ticks
+
+[demo-2018-04-30]: http://btrdb-viz-2018-04-30.surge.sh
+
 ## v2018.03.19
 
 [demo permalink][demo-2018-03-19]
